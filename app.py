@@ -1,4 +1,5 @@
 from flask import Flask, render_template, jsonify
+import ssl
 
 app = Flask(__name__)
 
@@ -26,4 +27,6 @@ def test():
 
 
 if __name__ == "__main__":
-    app.run(debug=True)
+    ssl_context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
+    ssl_context.load_cert_chain("cert.pem", "key.pem")
+    app.run(debug=True, ssl_context=ssl_context)

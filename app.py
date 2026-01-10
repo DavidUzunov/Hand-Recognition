@@ -302,7 +302,7 @@ def capture_hands(curr_image):
 			)
 		send = False
 		if curr_letter != last_letter:
-			if total_x >= 0.15 * :
+			if total_x >= 0.15 * image_width:
 				double_letter = True
 			last_x = 0
 			total_x = 0

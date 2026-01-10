@@ -128,7 +128,6 @@ dmypy.json
 .pyre/
 
 # VS Code (Linux)
-.vscode/
 *.code-workspace
 
 # Vim

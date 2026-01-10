@@ -35,20 +35,19 @@
 				const data = await response.json();
 
 				const statusDiv = document.getElementById('camera-status');
-				statusDiv.innerHTML = `
-					<div class="status-item">
-						<span class="status-label">Camera ID:</span> ${data.camera_id}
-					</div>
-					<div class="status-item">
-						<span class="status-label">Status:</span>
-						<span style="color: ${data.camera_available ? 'green' : 'red'}">
-							${data.camera_available ? '✓ Available' : '✗ Not Available'}
-						</span>
-					</div>
-					<div class="status-item">
-						<span class="status-label">Device:</span> ${data.device}
-					</div>
-				`;
+
+				// Build status HTML conditionally
+				let statusHTML = '<div class="status-item"><span class="status-label">Status:</span> ';
+				statusHTML += `<span style="color: ${data.camera_available ? 'green' : 'red'}">`;
+				statusHTML += `${data.camera_available ? '✓ Available' : '✗ Not Available'}</span></div>`;
+
+				// Only show camera ID and device if camera is available
+				if (data.camera_available) {
+					statusHTML += `<div class="status-item"><span class="status-label">Camera ID:</span> ${data.camera_id}</div>`;
+					statusHTML += `<div class="status-item"><span class="status-label">Device:</span> ${data.device}</div>`;
+				}
+
+				statusDiv.innerHTML = statusHTML;
 
 				// Populate camera selector with available cameras
 				const cameraSelect = document.getElementById('camera-select');

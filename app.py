@@ -51,38 +51,6 @@ def create_default_image():
         img, text2, (text_x2, text_y2), font, 1, (200, 200, 200), 2, cv2.LINE_AA
     )
 
-    # Add a camera icon using shapes
-    icon_center_x, icon_center_y = 640, 240
-    cv2.rectangle(
-        img,
-        (icon_center_x - 60, icon_center_y - 40),
-        (icon_center_x + 60, icon_center_y + 40),
-        (150, 150, 150),
-        3,
-    )
-    cv2.circle(img, (icon_center_x, icon_center_y), 25, (150, 150, 150), 3)
-    cv2.line(
-        img,
-        (icon_center_x + 60, icon_center_y - 40),
-        (icon_center_x + 80, icon_center_y - 60),
-        (150, 150, 150),
-        3,
-    )
-    cv2.line(
-        img,
-        (icon_center_x + 80, icon_center_y - 60),
-        (icon_center_x + 80, icon_center_y - 30),
-        (150, 150, 150),
-        3,
-    )
-    cv2.line(
-        img,
-        (icon_center_x + 80, icon_center_y - 30),
-        (icon_center_x + 60, icon_center_y - 10),
-        (150, 150, 150),
-        3,
-    )
-
     return img
 
 
@@ -154,9 +122,7 @@ def capture_frames():
 def generate_frames():
     """Generate frames for streaming and optionally process hands"""
     hands = mp_hands.Hands(
-        static_image_mode=False,
-        max_num_hands=2,
-        min_detection_confidence=0.5
+        static_image_mode=False, max_num_hands=2, min_detection_confidence=0.5
     )
 
     while True:
@@ -166,9 +132,10 @@ def generate_frames():
                 current_frame if current_frame is not None else default_image
             )
             frame_to_process = frame_to_send.copy()
+            is_default_image = not camera_available
 
         # Process hand detection if signing is active
-        if sign_active and frame_to_process is not None:
+        if sign_active and frame_to_process is not None and not is_default_image:
             try:
                 # Convert BGR to RGB for MediaPipe
                 frame_rgb = cv2.cvtColor(frame_to_process, cv2.COLOR_BGR2RGB)
@@ -182,7 +149,7 @@ def generate_frames():
                             hand_landmarks,
                             mp_hands.HAND_CONNECTIONS,
                             mp_drawing_styles.get_default_hand_landmarks_style(),
-                            mp_drawing_styles.get_default_hand_connections_style()
+                            mp_drawing_styles.get_default_hand_connections_style(),
                         )
                     # Update frame_to_send with drawn landmarks
                     frame_to_send = frame_to_process
@@ -202,8 +169,11 @@ def generate_frames():
             + b"\r\n"
         )
 
-        # Add a small delay to prevent excessive CPU usage
-        time.sleep(0.033)  # ~30 fps
+        # Add delay - 1 second for default image, ~30fps for camera feed
+        if is_default_image:
+            time.sleep(0.1)  # 1 second delay for default image
+        else:
+            time.sleep(0.033)  # ~30 fps for camera feed
 
     hands.close()
 
@@ -230,54 +200,54 @@ def set_camera_id(new_id):
 
 
 def set_sign_active(active):
-	"""Set whether hand sign detection is active"""
-	global sign_active
-	sign_active = active
+    """Set whether hand sign detection is active"""
+    global sign_active
+    sign_active = active
+
 
 def capture_hands():
-	# this will be what stores all images, placeholder for now
- 	IMAGES = []
-	with mp_hands.Hands(
-    	static_image_mode=True, max_num_hands=2, min_detection_confidence=0.5
+    # this will be thing that stores all images, placeholder for now
+    IMAGES = []
+    with mp_hands.Hands(
+        static_image_mode=True, max_num_hands=2, min_detection_confidence=0.5
     ) as hands:
-		for idx, file in enumerate(IMAGES):
-			# Read an image, flip it around y-axis for correct handedness output (see
-			# above).
-			image = cv2.flip(cv2.imread(current_frame), 1)
-			# Convert the BGR image to RGB before processing.
-			results = hands.process(cv2.cvtColor(image, cv2.COLOR_BGR2RGB))
+        for idx, file in enumerate(IMAGES):
+            # Read an image, flip it around y-axis for correct handedness output (see
+            # above).
+            image = cv2.flip(cv2.imread(file), 1)
+            # Convert the BGR image to RGB before processing.
+            results = hands.process(cv2.cvtColor(image, cv2.COLOR_BGR2RGB))
 
-			# Print handedness and draw hand landmarks on the image.
-			print("Handedness:", results.multi_handedness)
-			if not results.multi_hand_landmarks:
-				return
-			image_height, image_width, _ = image.shape
-			annotated_image = image.copy()
-			for hand_landmarks in results.multi_hand_landmarks:
-				print("hand_landmarks:", hand_landmarks)
-				print(
-					f"Index finger tip coordinates: (",
-					f"{hand_landmarks.landmark[mp_hands.HandLandmark.INDEX_FINGER_TIP].x * image_width}, "
-					f"{hand_landmarks.landmark[mp_hands.HandLandmark.INDEX_FINGER_TIP].y * image_height})",
-				)
-				mp_drawing.draw_landmarks(
-					annotated_image,
-					hand_landmarks,
-					mp_hands.HAND_CONNECTIONS,
-					mp_drawing_styles.get_default_hand_landmarks_style(),
-					mp_drawing_styles.get_default_hand_connections_style(),
-				)
-			cv2.imwrite(
-				"/tmp/annotated_image" + str(idx) + ".png", cv2.flip(annotated_image, 1)
-			)
-			# Draw hand world landmarks.
-			if not results.multi_hand_world_landmarks:
-				return
-			for hand_world_landmarks in results.multi_hand_world_landmarks:
-				mp_drawing.plot_landmarks(
-					hand_world_landmarks, mp_hands.HAND_CONNECTIONS, azimuth=5
-				)
+            # Print handedness and draw hand landmarks on the image.
+            print("Handedness:", results.multi_handedness)
+            if not results.multi_hand_landmarks:
+                return
+            image_height, image_width, _ = image.shape
+            annotated_image = image.copy()
+            for hand_landmarks in results.multi_hand_landmarks:
+                print("hand_landmarks:", hand_landmarks)
+                print(
+                    f"Index finger tip coordinates: (",
+                    f"{hand_landmarks.landmark[mp_hands.HandLandmark.INDEX_FINGER_TIP].x * image_width}, "
+                    f"{hand_landmarks.landmark[mp_hands.HandLandmark.INDEX_FINGER_TIP].y * image_height})",
+                )
+                mp_drawing.draw_landmarks(
+                    annotated_image,
+                    hand_landmarks,
+                    mp_hands.HAND_CONNECTIONS,
+                    mp_drawing_styles.get_default_hand_landmarks_style(),
+                    mp_drawing_styles.get_default_hand_connections_style(),
+                )
+            cv2.imwrite(
+                "/tmp/annotated_image" + str(idx) + ".png", cv2.flip(annotated_image, 1)
+            )
+            # Draw hand world landmarks.
+            if not results.multi_hand_world_landmarks:
+                return
+            for hand_world_landmarks in results.multi_hand_world_landmarks:
+                mp_drawing.plot_landmarks(
+                    hand_world_landmarks, mp_hands.HAND_CONNECTIONS, azimuth=5
+                )
 
 
-# Start camera capture on module import
-start_camera_capture()
+# Camera capture will be started by bootstrap.py

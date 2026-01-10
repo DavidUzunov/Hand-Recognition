@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<title>Camera</title>
+	<style>
+		body {
+			font-family: Arial, sans-serif;
+			display: flex;
+			justify-content: center;
+			align-items: center;
+			height: 100vh;
+			margin: 0;
+			background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+		}
+
+		.container {
+			text-align: center;
+			background: white;
+			padding: 20px;
+			border-radius: 10px;
+			box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+			width: 90%;
+			max-width: 800px;
+			display: flex;
+			flex-direction: column;
+		}
+
+		h1 {
+			color: #333;
+			margin-top: 0;
+			margin-bottom: 20px;
+		}
+
+		video {
+			width: 100%;
+			height: auto;
+			border-radius: 5px;
+			background-color: #000;
+		}
+
+		.textbar {
+			margin-top: 20px;
+			padding: 15px;
+			background-color: #f0f0f0;
+			border-radius: 5px;
+			font-size: 1.1em;
+			color: #333;
+			font-weight: bold;
+		}
+
+		button {
+			margin-top: 10px;
+			padding: 10px 20px;
+			font-size: 1em;
+			background-color: #667eea;
+			color: white;
+			border: none;
+			border-radius: 5px;
+			cursor: pointer;
+			transition: background-color 0.3s;
+		}
+
+		button:hover {
+			background-color: #764ba2;
+		}
+	</style>
+</head>
+
+<body>
+	<div class="container">
+		<h1>Webcam</h1>
+		<video id="webcam" playsinline autoplay></video>
+		<button onclick="toggleCamera()">Toggle Camera</button>
+		<div class="textbar">camera</div>
+	</div>
+
+	<script>
+		let stream = null;
+		const video = document.getElementById('webcam');
+
+		async function startCamera() {
+			try {
+				stream = await navigator.mediaDevices.getUserMedia({
+					video: { facingMode: 'user' }
+				});
+				video.srcObject = stream;
+			} catch (error) {
+				console.error('Error accessing camera:', error);
+				alert('Could not access webcam');
+			}
+		}
+
+		function stopCamera() {
+			if (stream) {
+				stream.getTracks().forEach(track => track.stop());
+				stream = null;
+			}
+		}
+
+		function toggleCamera() {
+			if (stream) {
+				stopCamera();
+			} else {
+				startCamera();
+			}
+		}
+
+		// Start camera on page load
+		window.addEventListener('load', startCamera);
+
+		// Stop camera when leaving page
+		window.addEventListener('beforeunload', stopCamera);
+	</script>
+</body>
+
+</html>

@@ -8,4 +8,5 @@ Nuts and bolts
 - ML running backend
 
 	- we need a dataset
-	- we need to find models
+	- ASL Dataset: https://www.kaggle.com/datasets/nguynbothng2/asl-alphabet-dataset
+	- Mediapipe from google: https://ai.google.dev/edge/mediapipe/solutions/vision/gesture_recognizer

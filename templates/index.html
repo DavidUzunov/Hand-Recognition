@@ -5,27 +5,42 @@
 	<meta charset="UTF-8">
 	<meta name="viewport" content="width=device-width, initial-scale=1.0">
 	<title>Signly</title>
+	<link rel="dns-prefetch" href="https://cdn.socket.io">
+	<link rel="preconnect" href="https://cdn.socket.io" crossorigin>
+	<link rel="prefetch" href="/no_camera">
 	<link rel="stylesheet" href="/static/style.css">
-	<script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
+	<script src="https://cdn.socket.io/4.8.3/socket.io.min.js"></script>
 </head>
 
 <body>
 	<div class="container">
 		<h1>Signly</h1>
-		<div class="video-container">
-			<img id="video-feed" alt="Live Camera Feed">
-		</div>
-		<button id="ping-button" onclick="pingServer()" style="display:none;">Ping Server</button>
-		<div id="response"></div>
-		<div id="camera-status" class="status-container"></div>
-		<div class="camera-selector">
-			<label for="camera-select">Select Camera:</label>
-			<select id="camera-select" onchange="changeCamera()">
-				<option value="">Loading cameras...</option>
-			</select>
-		</div>
-		<div class="controls-section">
-			<button id="sign-button" onclick="toggleSign()">Start Signing</button>
+		<div class="content-wrapper">
+			<div class="main-content">
+				<div class="video-container">
+					<img id="video-feed" alt="Live Camera Feed">
+				</div>
+				<button id="ping-button" onclick="pingServer()" style="display:none;">Ping Server</button>
+				<div id="response"></div>
+				<div class="camera-selector">
+					<label for="camera-select">Select Camera:</label>
+					<select id="camera-select" onchange="changeCamera()">
+						<option value="">Loading cameras...</option>
+					</select>
+				</div>
+				<div class="controls-section">
+					<button id="sign-button" onclick="toggleSign()">Start Signing</button>
+				</div>
+			</div>
+			<div id="transcript-sidebar" class="sidebar">
+				<div class="text-output">
+					<div class="transcript-header">
+						<label for="message-box">ASL Transcript:</label>
+						<button id="clear-transcript-button" onclick="clearTranscript()">Clear</button>
+					</div>
+					<textarea id="message-box" readonly rows="25" cols="40"></textarea>
+				</div>
+			</div>
 		</div>
 	</div>
 

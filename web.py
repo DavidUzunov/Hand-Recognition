@@ -22,6 +22,7 @@ from app import (
     sign_active,
     set_sign_active,
     create_default_image,
+    set_asl_transcript_callback,
 )
 
 app = Flask(__name__)
@@ -41,6 +42,17 @@ def hello_world():
 @app.route("/ping")
 def ping():
     return jsonify({"message": "Pong!", "status": "success"})
+
+
+def send_asl_transcript(message):
+    """Send an ASL transcript message to all connected clients via WebSocket"""
+    if connected_clients > 0:
+        with app.app_context():
+            socketio.emit("asl_transcript", {"message": message}, to=None)
+
+
+# Set the callback to avoid circular import
+set_asl_transcript_callback(send_asl_transcript)
 
 
 @app.route("/set_camera")
@@ -262,6 +274,13 @@ def send_ping_messages():
             with app.app_context():
                 socketio.emit("ping", {"message": "ping"}, to=None)
         time.sleep(15)
+
+
+def send_asl_transcript(message):
+    """Send an ASL transcript message to all connected clients via WebSocket"""
+    if connected_clients > 0:
+        with app.app_context():
+            socketio.emit("asl_transcript", {"message": message}, to=None)
 
 
 def get_camera_status():

@@ -4,30 +4,48 @@
 <head>
 	<meta charset="UTF-8">
 	<meta name="viewport" content="width=device-width, initial-scale=1.0">
-	<title>Hello World</title>
+	<title>Hand Recognition</title>
 	<style>
 		body {
 			font-family: Arial, sans-serif;
 			display: flex;
 			justify-content: center;
 			align-items: center;
-			height: 100vh;
+			min-height: 100vh;
 			margin: 0;
 			background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+			padding: 20px;
 		}
 
 		.container {
 			text-align: center;
 			background: white;
-			padding: 50px;
+			padding: 30px;
 			border-radius: 10px;
 			box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+			max-width: 900px;
+			width: 100%;
 		}
 
 		h1 {
 			color: #333;
-			font-size: 3em;
-			margin: 0;
+			font-size: 2.5em;
+			margin-top: 0;
+			margin-bottom: 30px;
+		}
+
+		.video-container {
+			width: 100%;
+			background-color: #000;
+			border-radius: 5px;
+			overflow: hidden;
+			margin-bottom: 20px;
+		}
+
+		img#video-feed {
+			width: 100%;
+			height: auto;
+			display: block;
 		}
 
 		button {
@@ -57,7 +75,10 @@
 
 <body>
 	<div class="container">
-		<h1>Hello World!</h1>
+		<h1>Hand Recognition</h1>
+		<div class="video-container">
+			<img id="video-feed" src="/video_feed" alt="Live Camera Feed">
+		</div>
 		<button onclick="pingServer()">Ping Server</button>
 		<div id="response"></div>
 	</div>

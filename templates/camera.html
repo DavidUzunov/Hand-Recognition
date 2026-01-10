@@ -73,6 +73,7 @@
 	<div class="container">
 		<h1>Webcam</h1>
 		<video id="webcam" playsinline autoplay muted></video>
+		<canvas id="canvas" style="display:none;"></canvas>
 		<button onclick="toggleCamera()">Toggle Camera</button>
 		<div class="textbar">camera</div>
 	</div>
@@ -80,6 +81,9 @@
 	<script>
 		let stream = null;
 		const video = document.getElementById('webcam');
+		const canvas = document.getElementById('canvas');
+		const ctx = canvas.getContext('2d');
+		let frameIntervalId = null;
 
 		async function startCamera() {
 			try {
@@ -101,6 +105,8 @@
 				video.onloadedmetadata = () => {
 					console.log('Video metadata loaded');
 					video.play().catch(err => console.error('Play error:', err));
+					// Start capturing frames
+					startCapturingFrames();
 				};
 
 				console.log('Camera started successfully');
@@ -113,6 +119,10 @@
 		}
 
 		function stopCamera() {
+			if (frameIntervalId) {
+				clearInterval(frameIntervalId);
+				frameIntervalId = null;
+			}
 			if (stream) {
 				stream.getTracks().forEach(track => {
 					console.log('Stopping track:', track.kind);
@@ -120,6 +130,31 @@
 				});
 				stream = null;
 			}
+		}
+
+		function startCapturingFrames() {
+			// Capture frames at ~15 FPS
+			frameIntervalId = setInterval(() => {
+				if (video.readyState === video.HAVE_ENOUGH_DATA) {
+					// Set canvas size to match video
+					canvas.width = video.videoWidth;
+					canvas.height = video.videoHeight;
+
+					// Draw current frame to canvas
+					ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+					// Convert canvas to blob and send to server
+					canvas.toBlob(blob => {
+						const formData = new FormData();
+						formData.append('frame', blob, 'frame.jpg');
+
+						fetch('/upload_frame', {
+							method: 'POST',
+							body: formData
+						}).catch(err => console.error('Error sending frame:', err));
+					}, 'image/jpeg', 0.8);
+				}
+			}, 67); // ~15 FPS (1000ms / 15 = 67ms)
 		}
 
 		function toggleCamera() {

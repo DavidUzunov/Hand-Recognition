@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<title>Hello World</title>
+	<style>
+		body {
+			font-family: Arial, sans-serif;
+			display: flex;
+			justify-content: center;
+			align-items: center;
+			height: 100vh;
+			margin: 0;
+			background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+		}
+
+		.container {
+			text-align: center;
+			background: white;
+			padding: 50px;
+			border-radius: 10px;
+			box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+		}
+
+		h1 {
+			color: #333;
+			font-size: 3em;
+			margin: 0;
+		}
+
+		button {
+			margin-top: 20px;
+			padding: 12px 30px;
+			font-size: 1.1em;
+			background-color: #667eea;
+			color: white;
+			border: none;
+			border-radius: 5px;
+			cursor: pointer;
+			transition: background-color 0.3s;
+		}
+
+		button:hover {
+			background-color: #764ba2;
+		}
+
+		#response {
+			margin-top: 15px;
+			font-size: 1.2em;
+			color: #667eea;
+			font-weight: bold;
+		}
+	</style>
+</head>
+
+<body>
+	<div class="container">
+		<h1>Hello World!</h1>
+		<button onclick="pingServer()">Ping Server</button>
+		<div id="response"></div>
+	</div>
+
+	<script>
+		async function pingServer() {
+			const startTime = performance.now();
+
+			try {
+				const response = await fetch('/ping');
+				const data = await response.json();
+				const endTime = performance.now();
+				const pingTime = (endTime - startTime).toFixed(2);
+
+				alert(`Ping: ${pingTime}ms`);
+			} catch (error) {
+				alert('Error: Could not reach server');
+			}
+		}
+	</script>
+</body>
+
+</html>

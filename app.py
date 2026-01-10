@@ -287,11 +287,11 @@ def capture_hands(curr_image):
 		image = cv2.flip(cv2.imread(curr_image), 1)
 		# Convert the BGR image to RGB before processing.
 		results = hands.process(cv2.cvtColor(image, cv2.COLOR_BGR2RGB))
-
-		# Print handedness
-		print("Handedness:", results.multi_handedness)
 		if not results.multi_hand_landmarks:
 			return
+		hand = results.multi_hand_landmarks
+		# Print handedness
+		print("Handedness:", results.multi_handedness)
 		image_height, image_width, _ = image.shape
 		for hand_landmarks in results.multi_hand_landmarks:
 			print("hand_landmarks:", hand_landmarks)

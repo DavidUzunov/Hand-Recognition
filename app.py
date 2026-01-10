@@ -289,7 +289,7 @@ def capture_hands(curr_image):
 		results = hands.process(cv2.cvtColor(image, cv2.COLOR_BGR2RGB))
 		if not results.multi_hand_landmarks:
 			return
-		hand = results.multi_hand_landmarks
+		hand = results.multi_hand_landmarks[0]
 		# Print handedness
 		print("Handedness:", results.multi_handedness)
 		image_height, image_width, _ = image.shape

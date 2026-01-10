@@ -235,7 +235,7 @@ def set_sign_active(active):
 	sign_active = active
 
 def capture_hands():
-	# this will bew
+	# this will be what stores all images, placeholder for now
  	IMAGES = []
 	with mp_hands.Hands(
     	static_image_mode=True, max_num_hands=2, min_detection_confidence=0.5

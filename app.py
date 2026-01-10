@@ -260,6 +260,6 @@ def capture_hands():
 			last_letter = "b"
 			last_x = 0
 			for hand_landmarks in results.multi_hand_landmarks:
-							curr_x = 0
+				curr_x = hand_land
 				if curr_letter == last_letter:
 					double_letter_tracking(hand_landmarks, last_x, curr_x)

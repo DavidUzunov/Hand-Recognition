@@ -205,6 +205,14 @@ def set_sign_active(active):
     sign_active = active
 
 
+def double_letter_tracking(hand_landmarks, last_x, total_x):
+    # this will track double letters
+	# anywhere over 0.15 of screen = double?
+    dummy = "doofus"
+    curr_x= hand_landmarks.landmark[mp_hands.HandLandmark.WRIST].x
+
+
+
 def capture_hands():
     # this will be thing that stores all images, placeholder for now
     IMAGES = []

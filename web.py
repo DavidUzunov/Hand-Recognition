@@ -6,9 +6,12 @@ from flask import (
     Response,
     send_from_directory,
 )
+from flask_socketio import SocketIO, emit
 import os
 import glob
 import cv2
+import threading
+import time
 from app import (
     generate_frames,
     frame_buffer,
@@ -21,6 +24,12 @@ from app import (
 )
 
 app = Flask(__name__)
+socketio = SocketIO(app, cors_allowed_origins="*")
+
+# Track connected clients and ping thread
+connected_clients = 0
+ping_thread = None
+stop_ping_thread = False
 
 
 @app.route("/")
@@ -154,6 +163,40 @@ def upload_frame():
     print(f"Got image - Buffer size: {len(frame_buffer)}")
 
     return jsonify({"status": "success", "buffer_size": len(frame_buffer)})
+
+
+def send_ping_messages():
+    """Send ping messages every 15 seconds to all connected clients"""
+    global stop_ping_thread
+    while not stop_ping_thread:
+        if connected_clients > 0:
+            with app.app_context():
+                socketio.emit('ping', {'message': 'ping'}, to=None)
+        time.sleep(15)
+
+
+@socketio.on('connect')
+def handle_connect():
+    """Handle client connection"""
+    global connected_clients, ping_thread, stop_ping_thread
+    connected_clients += 1
+    print(f"Client connected. Total clients: {connected_clients}")
+
+    # Start ping thread if not already running
+    if ping_thread is None or not ping_thread.is_alive():
+        stop_ping_thread = False
+        ping_thread = threading.Thread(target=send_ping_messages, daemon=True)
+        ping_thread.start()
+
+    emit('connected', {'message': 'Connected to server'})
+
+
+@socketio.on('disconnect')
+def handle_disconnect():
+    """Handle client disconnection"""
+    global connected_clients
+    connected_clients -= 1
+    print(f"Client disconnected. Total clients: {connected_clients}")
 
 
 @app.errorhandler(404)

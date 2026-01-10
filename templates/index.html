@@ -6,6 +6,7 @@
 	<meta name="viewport" content="width=device-width, initial-scale=1.0">
 	<title>Signly</title>
 	<link rel="stylesheet" href="/static/style.css">
+	<script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
 </head>
 
 <body>
@@ -29,6 +30,21 @@
 	</div>
 
 	<script>
+		// Initialize WebSocket connection
+		const socket = io();
+
+		socket.on('connect', () => {
+			console.log('Connected to server');
+		});
+
+		socket.on('ping', (data) => {
+			console.log('Received ping from server:', data.message);
+		});
+
+		socket.on('disconnect', () => {
+			console.log('Disconnected from server');
+		});
+
 		async function getCameraStatus() {
 			try {
 				const response = await fetch('/camera_status');

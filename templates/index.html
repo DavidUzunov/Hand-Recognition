@@ -4,86 +4,105 @@
 <head>
 	<meta charset="UTF-8">
 	<meta name="viewport" content="width=device-width, initial-scale=1.0">
-	<title>Hand Recognition</title>
-	<style>
-		body {
-			font-family: Arial, sans-serif;
-			display: flex;
-			justify-content: center;
-			align-items: center;
-			min-height: 100vh;
-			margin: 0;
-			background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-			padding: 20px;
-		}
-
-		.container {
-			text-align: center;
-			background: white;
-			padding: 30px;
-			border-radius: 10px;
-			box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
-			max-width: 900px;
-			width: 100%;
-		}
-
-		h1 {
-			color: #333;
-			font-size: 2.5em;
-			margin-top: 0;
-			margin-bottom: 30px;
-		}
-
-		.video-container {
-			width: 100%;
-			background-color: #000;
-			border-radius: 5px;
-			overflow: hidden;
-			margin-bottom: 20px;
-		}
-
-		img#video-feed {
-			width: 100%;
-			height: auto;
-			display: block;
-		}
-
-		button {
-			margin-top: 20px;
-			padding: 12px 30px;
-			font-size: 1.1em;
-			background-color: #667eea;
-			color: white;
-			border: none;
-			border-radius: 5px;
-			cursor: pointer;
-			transition: background-color 0.3s;
-		}
-
-		button:hover {
-			background-color: #764ba2;
-		}
-
-		#response {
-			margin-top: 15px;
-			font-size: 1.2em;
-			color: #667eea;
-			font-weight: bold;
-		}
-	</style>
+	<title>Signly</title>
+	<link rel="stylesheet" href="/static/style.css">
 </head>
 
 <body>
 	<div class="container">
-		<h1>Hand Recognition</h1>
+		<h1>Signly</h1>
 		<div class="video-container">
 			<img id="video-feed" src="/video_feed" alt="Live Camera Feed">
 		</div>
 		<button onclick="pingServer()">Ping Server</button>
 		<div id="response"></div>
+		<div id="camera-status" class="status-container"></div>
+		<div class="camera-selector">
+			<label for="camera-select">Select Camera:</label>
+			<select id="camera-select" onchange="changeCamera()">
+				<option value="">Loading cameras...</option>
+			</select>
+		</div>
+		<div class="controls-section">
+			<button id="sign-button" onclick="toggleSign()">Start Signing</button>
+		</div>
 	</div>
 
 	<script>
+		async function getCameraStatus() {
+			try {
+				const response = await fetch('/camera_status');
+				const data = await response.json();
+
+				const statusDiv = document.getElementById('camera-status');
+				statusDiv.innerHTML = `
+					<div class="status-item">
+						<span class="status-label">Camera ID:</span> ${data.camera_id}
+					</div>
+					<div class="status-item">
+						<span class="status-label">Status:</span>
+						<span style="color: ${data.camera_available ? 'green' : 'red'}">
+							${data.camera_available ? '✓ Available' : '✗ Not Available'}
+						</span>
+					</div>
+					<div class="status-item">
+						<span class="status-label">Device:</span> ${data.device}
+					</div>
+				`;
+
+				// Populate camera selector with available cameras
+				const cameraSelect = document.getElementById('camera-select');
+				cameraSelect.innerHTML = '';
+
+				if (data.available_cameras && data.available_cameras.length > 0) {
+					data.available_cameras.forEach(cameraId => {
+						const option = document.createElement('option');
+						option.value = cameraId;
+						option.textContent = `/dev/video${cameraId}`;
+						if (cameraId === data.camera_id) {
+							option.selected = true;
+						}
+						cameraSelect.appendChild(option);
+					});
+				} else {
+					cameraSelect.innerHTML = '<option value="">No cameras available</option>';
+				}
+			} catch (error) {
+				console.error('Error fetching camera status:', error);
+				document.getElementById('camera-status').innerHTML = '<p style="color: red;">Failed to fetch camera status</p>';
+				document.getElementById('camera-select').innerHTML = '<option value="">Error loading cameras</option>';
+			}
+		}
+
+		async function changeCamera() {
+			const cameraSelect = document.getElementById('camera-select');
+			const cameraId = cameraSelect.value;
+
+			if (!cameraId) {
+				return;
+			}
+
+			try {
+				const response = await fetch(`/set_camera?id=${cameraId}`);
+				const data = await response.json();
+
+				if (data.status === 'success') {
+					console.log(`Camera switched to ${data.current_camera}`);
+					// Refresh camera status after switching
+					setTimeout(getCameraStatus, 500);
+				} else {
+					alert(`Error: ${data.error}`);
+					// Reset selector to current camera
+					getCameraStatus();
+				}
+			} catch (error) {
+				console.error('Error changing camera:', error);
+				alert('Failed to change camera');
+				// Reset selector to current camera
+				getCameraStatus();
+			}
+		}
+
 		async function pingServer() {
 			const startTime = performance.now();
 
@@ -98,6 +117,54 @@
 				alert('Error: Could not reach server');
 			}
 		}
+
+		async function getSignStatus() {
+			try {
+				const response = await fetch('/sign_status');
+				const data = await response.json();
+				updateSignButton(data.signing_active);
+			} catch (error) {
+				console.error('Error fetching sign status:', error);
+			}
+		}
+
+		function updateSignButton(isActive) {
+			const button = document.getElementById('sign-button');
+			if (isActive) {
+				button.textContent = 'Stop Signing';
+				button.classList.add('active');
+			} else {
+				button.textContent = 'Start Signing';
+				button.classList.remove('active');
+			}
+		}
+
+		async function toggleSign() {
+			const button = document.getElementById('sign-button');
+			const isCurrentlyActive = button.classList.contains('active');
+			const newState = !isCurrentlyActive;
+
+			try {
+				const response = await fetch(`/toggle_sign?active=${newState}`);
+				const data = await response.json();
+
+				if (data.status === 'success') {
+					updateSignButton(data.signing_active);
+					console.log(data.message);
+				} else {
+					alert('Error toggling signing status');
+				}
+			} catch (error) {
+				console.error('Error toggling sign status:', error);
+				alert('Failed to toggle signing');
+			}
+		}
+
+		// Load camera status and sign status when page loads
+		window.addEventListener('load', () => {
+			getCameraStatus();
+			getSignStatus();
+		});
 	</script>
 </body>
 

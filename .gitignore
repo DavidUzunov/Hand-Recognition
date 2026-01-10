@@ -95,7 +95,7 @@ celerybeat.pid
 # SageMath parsed files
 *.sage.py
 
-# Environments
+# Python Environments (Linux)
 .env
 .venv
 env/
@@ -127,15 +127,21 @@ dmypy.json
 # Pyre type checker
 .pyre/
 
-# VS Code
+# VS Code (Linux)
 .vscode/
-!.vscode/launch.json
-!.vscode/settings.json
-!.vscode/tasks.json
-!.vscode/extensions.json
+*.code-workspace
 
-# macOS
-.DS_Store
+# Vim
+.swp
+.swo
+*~
+.vim/
 
-# PyCharm
-.idea/
+# nano
+.nano_history
+
+# Linux system files
+.Xauthority
+.bash_history
+.cache/
+.local/

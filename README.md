@@ -1,2 +1,3 @@
-# Hand-Recognition
-SBHacks XII Project - Hand recognition thing.
+# Signly
+
+SBHacks XII Project - Hand gesture recognition and sign language interpretation.

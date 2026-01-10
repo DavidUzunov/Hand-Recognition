@@ -1,5 +1,9 @@
 # Plan
 
+# start/stop with button
+# feed frame data into model
+
+
 Nuts and bolts
 - Webcam
 

@@ -211,10 +211,16 @@ def double_letter_tracking(hand_landmarks, last_x, total_x):
 	curr_x = hand_landmarks.landmark[mp_hands.HandLandmark.WRIST].x
 	total_x = total_x + (curr_x - last_x)
 
-
+def transcribe():
+	# this will transcribe letters
+	dummy = "dingus"
 
 def capture_hands():
 	# this will be thing that stores all images, placeholder for now
+	last_x = 0
+	total_x = 0
+	curr_x = 0
+	double_letter = False
 	IMAGES = []
 	with mp_hands.Hands(
 		static_image_mode=True, max_num_hands=2, min_detection_confidence=0.5
@@ -257,9 +263,16 @@ def capture_hands():
 					hand_world_landmarks, mp_hands.HAND_CONNECTIONS, azimuth=5
 				)
 			curr_letter = "a" # placeholder value --> will store actual current letter
-			last_letter = "b"
-			last_x = 0
-			for hand_landmarks in results.multi_hand_landmarks:
-				curr_x = hand_land
-				if curr_letter == last_letter:
-					double_letter_tracking(hand_landmarks, last_x, curr_x)
+			last_letter = "b" # ditto
+			if curr_letter != last_letter:
+				if total_x >= 0.15:
+					double_letter = True
+				last_x = 0
+				total_x = 0
+				transcribe(last_letter, double_letter)
+				double_letter = False
+			# checks for double letters
+			curr_x = results.multi_hand_landmarks[mp_hands.HandLandmark.WRIST].x
+			if curr_letter == last_letter:
+				double_letter_tracking(hand_landmarks, last_x, curr_x)
+			curr_x = 0

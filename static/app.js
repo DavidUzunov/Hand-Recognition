@@ -13,8 +13,9 @@ socket.on('camera_status', (data) => {
 	updateCameraStatus(data);
 });
 
-socket.on('disconnect', () => {
-	console.log('Disconnected from server');
+socket.on('sign_status', (data) => {
+	console.log('Received sign status:', data);
+	updateSignButton(data.signing_active);
 });
 
 function updateCameraStatus(data) {
@@ -34,8 +35,8 @@ function updateCameraStatus(data) {
 			// Load video feed when camera is available
 			videoFeed.src = '/video_feed';
 		} else {
-			// Remove video feed source when camera is not available
-			videoFeed.src = '';
+			// Show "camera not available" placeholder
+			videoFeed.src = '/no_camera';
 		}
 
 		statusDiv.innerHTML = statusHTML;
@@ -110,9 +111,7 @@ async function pingServer() {
 
 async function getSignStatus() {
 	try {
-		const response = await fetch('/sign_status');
-		const data = await response.json();
-		updateSignButton(data.signing_active);
+		socket.emit('get_sign_status');
 	} catch (error) {
 		console.error('Error fetching sign status:', error);
 	}
@@ -135,22 +134,26 @@ async function toggleSign() {
 	const newState = !isCurrentlyActive;
 
 	try {
-		const response = await fetch(`/toggle_sign?active=${newState}`);
-		const data = await response.json();
-
-		if (data.status === 'success') {
-			updateSignButton(data.signing_active);
-			console.log(data.message);
-		} else {
-			alert('Error toggling signing status');
-		}
+		socket.emit('toggle_sign', { active: newState });
 	} catch (error) {
 		console.error('Error toggling sign status:', error);
 		alert('Failed to toggle signing');
 	}
 }
 
+// Check for debug mode in URL
+function checkDebugMode() {
+	const params = new URLSearchParams(window.location.search);
+	if (params.has('debug')) {
+		const pingButton = document.getElementById('ping-button');
+		if (pingButton) {
+			pingButton.style.display = 'block';
+		}
+	}
+}
+
 // Load sign status when page loads
 window.addEventListener('load', () => {
 	getSignStatus();
+	checkDebugMode();
 });

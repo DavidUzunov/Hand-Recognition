@@ -12,17 +12,7 @@ import glob
 import cv2
 import threading
 import time
-from app import (
-    generate_frames,
-    frame_buffer,
-    camera_id,
-    camera_available,
-    start_camera_capture,
-    set_camera_id,
-    sign_active,
-    set_sign_active,
-    create_default_image,
-)
+import app as app_module
 
 app = Flask(__name__)
 socketio = SocketIO(app, cors_allowed_origins="*")
@@ -97,9 +87,9 @@ def camera_status():
 
     return jsonify(
         {
-            "camera_id": camera_id,
-            "camera_available": camera_available,
-            "device": f"/dev/video{camera_id}",
+            "camera_id": app_module.camera_id,
+            "camera_available": app_module.camera_available,
+            "device": f"/dev/video{app_module.camera_id}",
             "available_cameras": available_cameras,
         }
     )
@@ -112,7 +102,7 @@ def no_camera():
         import io
 
         # Use the default image from app.py
-        img = create_default_image()
+        img = app_module.create_default_image()
 
         # Convert image to PNG bytes
         _, png = cv2.imencode(".png", img)
@@ -137,7 +127,7 @@ def favicon():
 def video_feed():
     """Stream video frames"""
     return Response(
-        generate_frames(), mimetype="multipart/x-mixed-replace; boundary=frame"
+        app_module.generate_frames(), mimetype="multipart/x-mixed-replace; boundary=frame"
     )
 
 
@@ -152,7 +142,7 @@ def handle_get_sign_status():
     with app.app_context():
         emit(
             "sign_status",
-            {"signing_active": sign_active},
+            {"signing_active": app_module.sign_active},
         )
 
 
@@ -162,11 +152,11 @@ def handle_toggle_sign(data):
     if data is None:
         data = {}
     new_state = data.get("active", not sign_active)
-    set_sign_active(new_state)
+    app_module.set_sign_active(new_state)
     with app.app_context():
         emit(
             "sign_status",
-            {"signing_active": sign_active},
+            {"signing_active": app_module.sign_active},
             to=None,
         )
 
@@ -181,8 +171,8 @@ def debug():
 
     # Get frame buffer info
     frame_buffer_info = {
-        "size": len(frame_buffer),
-        "max_size": frame_buffer.maxlen,
+        "size": len(app_module.frame_buffer),
+        "max_size": app_module.frame_buffer.maxlen,
     }
 
     # Get thread info
@@ -218,7 +208,7 @@ def debug():
 
     # Get signing info
     signing_info = {
-        "signing_active": sign_active,
+        "signing_active": app_module.sign_active,
     }
 
     # Compile all debug info
@@ -281,9 +271,9 @@ def get_camera_status():
             pass
 
     return {
-        "camera_id": camera_id,
-        "camera_available": camera_available,
-        "device": f"/dev/video{camera_id}" if camera_available else None,
+        "camera_id": app_module.camera_id,
+        "camera_available": app_module.camera_available,
+        "device": f"/dev/video{app_module.camera_id}" if app_module.camera_available else None,
         "available_cameras": available_cameras,
     }
 

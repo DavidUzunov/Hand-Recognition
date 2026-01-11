@@ -2,6 +2,8 @@
 
 SBHacks XII Project - Hand gesture recognition and sign language interpretation.
 
+Note: GPT is used heavily on this branch.
+
 ## Setup (recommended)
 
 This project requires a Python version compatible with TensorFlow (use Python 3.11).

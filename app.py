@@ -1,13 +1,27 @@
 from collections import deque
 import cv2
 import mediapipe as mp
+# mediapipe changed its top-level API in 0.10+: the legacy `mp.solutions` API
+# may not be available. Try to use it if present; otherwise fall back to
+# disabling landmark drawing so the server can run. The app can be extended
+# later to use `mediapipe.tasks.python` for landmarking if desired.
+try:
+	mp_drawing = mp.solutions.drawing_utils
+	mp_drawing_styles = mp.solutions.drawing_styles
+	mp_hands = mp.solutions.hands
+	mediapipe_has_solutions = True
+except Exception:
+	mp_drawing = None
+	mp_drawing_styles = None
+	mp_hands = None
+	mediapipe_has_solutions = False
+	print("Warning: mediapipe.solutions not available; hand landmark drawing disabled.")
 import numpy as np
 import threading
 import time
+import glob
 
-mp_drawing = mp.solutions.drawing_utils
-mp_drawing_styles = mp.solutions.drawing_styles
-mp_hands = mp.solutions.hands
+# (mp_drawing, mp_drawing_styles, mp_hands) already set above
 
 # Memory buffer to store frames (max 30 frames)
 frame_buffer = deque(maxlen=30)  # JPG bytes
@@ -21,6 +35,11 @@ camera_id = 0  # Default camera ID
 capture_thread = None
 stop_capture = False
 sign_active = False  # Track if hand signing capture is active
+# Latest model-ready frame (numpy array, RGB, float32 normalized to [0,1])
+model_frame = None
+asl_transcript_callback = None
+inference_thread = None
+inference_stop = False
 
 
 def create_default_image():
@@ -58,35 +77,76 @@ def create_default_image():
 default_image = create_default_image()
 
 
+def detect_available_cameras():
+	"""Detect available camera devices and return list of camera IDs"""
+	available_cameras = []
+	for video_device in sorted(glob.glob("/dev/video*")):
+		try:
+			device_num = int(video_device.split("video")[1])
+			cap_test = cv2.VideoCapture(device_num, cv2.CAP_V4L2)
+			time.sleep(0.1)
+			if cap_test.isOpened():
+				available_cameras.append(device_num)
+				cap_test.release()
+		except Exception:
+			pass
+	return available_cameras
+
+
+def set_default_camera():
+	"""Set camera_id to first available camera, or keep existing"""
+	global camera_id
+	available = detect_available_cameras()
+	if available:
+		camera_id = available[0]
+		print(f"Found {len(available)} camera(s). Using camera {camera_id} (/dev/video{camera_id})")
+		if len(available) > 1:
+			print(f"Other cameras available: {[f'/dev/video{c}' for c in available[1:]]}")
+	else:
+		print("No cameras detected; will use default image until a camera is connected.")
+
+
 def capture_frames():
 	"""Continuously capture frames from USB webcam (Raspberry Pi compatible)"""
-	global cap, current_frame, camera_available, camera_id, stop_capture
+	global cap, current_frame, camera_available, camera_id, stop_capture, model_frame
 
-	# Try to open USB camera with selected ID
-	cap = cv2.VideoCapture(
-		camera_id, cv2.CAP_V4L2
-	)  # Use V4L2 backend for better Raspberry Pi USB camera support
+	# Helper to try opening a device id
+	def try_open(dev_id):
+		c = cv2.VideoCapture(dev_id, cv2.CAP_V4L2)
+		time.sleep(0.2)
+		if c.isOpened():
+			return c
+		try:
+			c.release()
+		except Exception:
+			pass
+		return None
 
-	# Give the camera time to initialize
-	time.sleep(0.5)
+	# First try the configured camera_id, then probe available devices
+	cap = try_open(camera_id)
+	if cap is None:
+		available = detect_available_cameras()
+		for dev in available:
+			cap = try_open(dev)
+			if cap is not None:
+				camera_id = dev
+				break
 
-	# Check if camera is available
-	if not cap.isOpened():
-		print(
-			f"WARNING: No USB camera detected on /dev/video{camera_id}. Using default image."
-		)
+	if cap is None or not cap.isOpened():
+		print(f"WARNING: No USB camera detected on /dev/video{camera_id}. Using default image.")
 		camera_available = False
 		with frame_lock:
 			current_frame = default_image.copy()
-		cap.release()
 	else:
 		camera_available = True
-		# Set camera properties optimized for Raspberry Pi USB cameras
 		cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1280)
 		cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 720)
 		cap.set(cv2.CAP_PROP_FPS, 15)
-		cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)  # Minimize latency
-		print("USB camera detected and initialized successfully on Raspberry Pi.")
+		try:
+			cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
+		except Exception:
+			pass
+		print(f"USB camera detected and initialized successfully on /dev/video{camera_id}.")
 
 	while True:
 		if camera_available:
@@ -98,32 +158,45 @@ def capture_frames():
 					current_frame = default_image.copy()
 				break
 
-			# Check if we should stop capturing
 			if stop_capture:
 				print("Stopping camera capture...")
 				break
 
 			with frame_lock:
 				current_frame = frame.copy()
-				# Store frame in buffer
+				# Store frame in buffer (jpeg bytes)
 				_, jpeg = cv2.imencode(".jpg", frame)
 				frame_buffer.append(jpeg.tobytes())
+				# Prepare a model-ready RGB float32 frame (224x224 normalized)
+				try:
+					rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+					small = cv2.resize(rgb, (224, 224), interpolation=cv2.INTER_LINEAR)
+					model_frame = small.astype(np.float32) / 255.0
+				except Exception:
+					model_frame = None
 				print(f"Got image - Buffer size: {len(frame_buffer)}")
 		else:
-			# If no camera, just keep the default image
 			with frame_lock:
 				current_frame = default_image.copy()
+				model_frame = None
 			time.sleep(0.1)
 
 	if cap is not None:
-		cap.release()
+		try:
+			cap.release()
+		except Exception:
+			pass
 
 
 def generate_frames():
 	"""Generate frames for streaming and optionally process hands"""
-	hands = mp_hands.Hands(
-		static_image_mode=False, max_num_hands=2, min_detection_confidence=0.5
-	)
+	# Only create the legacy `Hands` detector if the `mp.solutions` API
+	# is available. If not, skip hand processing (server still runs).
+	hands = None
+	if mediapipe_has_solutions and mp_hands is not None:
+		hands = mp_hands.Hands(
+			static_image_mode=False, max_num_hands=2, min_detection_confidence=0.5
+		)
 
 	while True:
 		with frame_lock:
@@ -134,23 +207,37 @@ def generate_frames():
 			frame_to_process = frame_to_send.copy()
 			is_default_image = not camera_available
 
-		# Process hand detection if signing is active
-		if sign_active and frame_to_process is not None and not is_default_image:
+		# Process hand detection if signing is active and the legacy
+		# `mp.solutions` API is available.
+		if (
+			sign_active
+			and frame_to_process is not None
+			and not is_default_image
+			and hands is not None
+		):
 			try:
 				# Convert BGR to RGB for MediaPipe
 				frame_rgb = cv2.cvtColor(frame_to_process, cv2.COLOR_BGR2RGB)
 				results = hands.process(frame_rgb)
 
-				# Draw hand landmarks if detected
-				if results.multi_hand_landmarks:
+				# Draw hand landmarks if detected and drawing utils are present
+				if (
+					results is not None
+					and getattr(results, "multi_hand_landmarks", None)
+					and mp_drawing is not None
+				):
 					for hand_landmarks in results.multi_hand_landmarks:
-						mp_drawing.draw_landmarks(
-							frame_to_process,
-							hand_landmarks,
-							mp_hands.HAND_CONNECTIONS,
-							mp_drawing_styles.get_default_hand_landmarks_style(),
-							mp_drawing_styles.get_default_hand_connections_style(),
-						)
+						try:
+							mp_drawing.draw_landmarks(
+								frame_to_process,
+								hand_landmarks,
+								mp_hands.HAND_CONNECTIONS,
+								mp_drawing_styles.get_default_hand_landmarks_style(),
+								mp_drawing_styles.get_default_hand_connections_style(),
+							)
+						except Exception:
+							# drawing failures shouldn't crash the server
+							pass
 					# Update frame_to_send with drawn landmarks
 					frame_to_send = frame_to_process
 			except Exception as e:
@@ -175,12 +262,16 @@ def generate_frames():
 		else:
 			time.sleep(0.033)  # ~30 fps for camera feed
 
-	hands.close()
+	if hands is not None:
+		hands.close()
 
 
 def start_camera_capture():
 	"""Start or restart camera capture thread"""
 	global capture_thread, stop_capture
+
+	# Ensure default camera selection is up-to-date
+	set_default_camera()
 
 	# Stop existing thread if running
 	if capture_thread and capture_thread.is_alive():
@@ -203,6 +294,98 @@ def set_sign_active(active):
 	"""Set whether hand sign detection is active"""
 	global sign_active
 	sign_active = active
+	# Start inference thread when enabling sign capture
+	if sign_active:
+		start_sign_inference()
+
+
+def get_model_input():
+	"""Return the latest model-ready frame (RGB float32 224x224) or None."""
+	global model_frame
+	with frame_lock:
+		if model_frame is None:
+			return None
+		return model_frame.copy()
+
+
+def get_recent_frames(count: int = 30):
+	"""Return up to `count` most recent frames from the buffer as model-ready arrays.
+
+	Returns a list of numpy arrays shaped (224,224,3) dtype float32 normalized [0,1].
+	"""
+	results = []
+	with frame_lock:
+		items = list(frame_buffer)[-count:]
+	for b in items:
+		try:
+			arr = np.frombuffer(b, dtype=np.uint8)
+			img = cv2.imdecode(arr, cv2.IMREAD_COLOR)
+			if img is None:
+				continue
+			rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+			small = cv2.resize(rgb, (224, 224), interpolation=cv2.INTER_LINEAR)
+			results.append(small.astype(np.float32) / 255.0)
+		except Exception:
+			continue
+	return results
+
+
+def get_sequence_for_model(seq_len: int = 30):
+	"""Return a numpy array shaped (N,224,224,3) with the latest up to seq_len frames.
+
+	If fewer than `seq_len` frames are available, returns the available frames.
+	"""
+	frames = get_recent_frames(seq_len)
+	if not frames:
+		return None
+	return np.stack(frames, axis=0)
+
+
+def set_asl_transcript_callback(callback):
+	"""Set a callback that receives a sequence numpy array when inference runs.
+
+	Callback signature: fn(sequence: np.ndarray) -> None
+	"""
+	global asl_transcript_callback
+	asl_transcript_callback = callback
+
+
+def sign_inference_loop(poll_interval: float = 0.5, seq_len: int = 30):
+	"""Background loop that collects sequences while `sign_active` is True and
+	invokes the `asl_transcript_callback` with the sequence for downstream ML.
+	"""
+	global inference_stop
+	while not inference_stop:
+		if not sign_active:
+			time.sleep(poll_interval)
+			continue
+
+		seq = get_sequence_for_model(seq_len)
+		if seq is not None:
+			try:
+				if asl_transcript_callback is not None:
+					asl_transcript_callback(seq)
+			except Exception as e:
+				print(f"Error in ASL callback: {e}")
+
+		time.sleep(poll_interval)
+
+
+def start_sign_inference():
+	"""Start the inference background thread if not already running."""
+	global inference_thread, inference_stop
+	if inference_thread and inference_thread.is_alive():
+		return
+	inference_stop = False
+	inference_thread = threading.Thread(target=sign_inference_loop, daemon=True)
+	inference_thread.start()
+
+
+def stop_sign_inference():
+	global inference_stop, inference_thread
+	inference_stop = True
+	if inference_thread:
+		inference_thread.join(timeout=1.0)
 
 
 def double_letter_tracking(hand_landmarks, last_x, total_x):

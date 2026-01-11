@@ -13,25 +13,10 @@ mp_drawing_styles = mp.solutions.drawing_styles
 mp_hands = mp.solutions.hands
 model = tf.keras.models.load_model("model/asl_model.h5")
 
-# Global MediaPipe Hands instance (lazy loaded on first use)
-_hands_detector = None
-_hands_detector_lock = threading.Lock()
-
-def get_hands_detector():
-	"""Get or create the global Hands detector instance (thread-safe)"""
-	global _hands_detector
-	with _hands_detector_lock:
-		if _hands_detector is None:
-			print("Initializing MediaPipe Hands detector...")
-			_hands_detector = mp_hands.Hands(
-				static_image_mode=True, max_num_hands=2, min_detection_confidence=0.5
-			)
-			print("MediaPipe Hands detector ready")
-		return _hands_detector
-
 
 # Memory buffer to store frames (max 30 frames)
 frame_buffer = deque(maxlen=30)  # JPG bytes
+global frame_byte_q
 frame_byte_q = Queue(maxsize=5)
 
 
@@ -163,9 +148,11 @@ def process_hand_data(hand):
 
 def get_letter(data):
 	global curr_letter
+	print("predicting letter")
 	prediction = model.predict(data, verbose=0)
 	id = np.argmax(prediction)
 	curr_letter = LETTERS[id]
+	print(f"letter prediicted: {curr_letter}")
 
 
 def capture_hands(frame_byte_q):
@@ -175,38 +162,57 @@ def capture_hands(frame_byte_q):
 	global total_x
 	global double_letter
 	global send
+	frame_counter = 0
+	hands = mp_hands.Hands(static_image_mode=True, max_num_hands=2, min_detection_confidence=0.5)
+	print("Starting capture hands thread")
 	while True:
+		print("Ready to process on get")
 		curr_image = frame_byte_q.get(block=True)
-		with get_hands_detector() as hands:
-			# Read an image, flip it around y-axis for correct handedness output
-			nparr = np.frombuffer(curr_image, np.uint8)
-			image = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
-			if image is None:
-				return
-			image = cv2.flip(image, 1)
-			# Convert the BGR image to RGB before processing.
-			results = hands.process(cv2.cvtColor(image, cv2.COLOR_BGR2RGB))
-			if not results.multi_hand_landmarks:
-				return
-			primary_hand = results.multi_hand_landmarks[0]
-			data = process_hand_data(primary_hand)
-			get_letter(data)
-			send = False
-			if curr_letter != last_letter:
-				if total_x >= 0.15:
-					double_letter = True
-				if curr_letter.isspace() == True:
-					send = True
-				if last_letter.isspace() == False:
-					curr_letter = curr_letter.lower()
-				transcribe(curr_letter, double_letter, send)
-				last_x = 0
-				total_x = 0
-				double_letter = False
-				last_letter = curr_letter
-			# checks for double letters via wrist data
-			if curr_letter == last_letter:
-				curr_x = primary_hand.landmark[0].x
-				total_x = total_x + (curr_x - last_x)
-				last_x = curr_x
+		frame_counter += 1
+		print(f"[capture_hands] Processing frame {frame_counter}")
+		# Read an image, flip it around y-axis for correct handedness output
+		nparr = np.frombuffer(curr_image, np.uint8)
+		if nparr is None:
+			print("NP Array failed")
+		print("Made an NP Array correctly")
+		image = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+		if image is None:
+			print(
+				f"[capture_hands] Dropped frame {frame_counter}: image decode failed"
+			)
+			continue
+		print("imdecode worked")
+		image = cv2.flip(image, 1)
+		print("cv2 flip worked")
+		# Convert the BGR image to RGB before processing.
+		results = hands.process(cv2.cvtColor(image, cv2.COLOR_BGR2RGB))
+		print("got hands process to work")
+		if not results.multi_hand_landmarks:
+			print(
+				f"[capture_hands] Dropped frame {frame_counter}: no hand landmarks detected"
+			)
+			continue
+		print("got past if")
+		primary_hand = results.multi_hand_landmarks[0]
+		print("processing hand data")
+		data = process_hand_data(primary_hand)
+		print("processed hand data")
+		get_letter(data)
+		send = False
+		if curr_letter != last_letter:
+			if total_x >= 0.15:
+				double_letter = True
+			if curr_letter.isspace() == True:
+				send = True
+			transcribe(last_letter, double_letter, send)
+			last_x = 0
+			total_x = 0
+			double_letter = False
+			last_letter = curr_letter
+		# checks for double letters via wrist data
+		if curr_letter == last_letter:
+			curr_x = primary_hand.landmark[0].x
+			total_x = total_x + (curr_x - last_x)
+			last_x = curr_x
 			curr_x = 0
+		print(f"Processeed frame {frame_counter}!")

@@ -82,9 +82,9 @@ def main():
 	print("Press Ctrl+C to shutdown gracefully")
 	print("=" * 60)
 
-	run_https()
 	p1 = Process(target=app_module.capture_hands, args=(app_module.frame_byte_q,))
 	p1.start()
+	run_https()
 
 
 if __name__ == "__main__":

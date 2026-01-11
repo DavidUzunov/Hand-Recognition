@@ -25,6 +25,8 @@ from app import (
 	capture_hands,
 	frame_byte_q
 )
+from queue import Queue
+from gesture_processor import ThreadSafeGestureProcessor, GestureFrame
 
 # --- App Setup ---
 app = Flask(__name__)
@@ -36,8 +38,12 @@ stop_ping_thread = False
 # Track if a host is logged in
 host_logged_in = False
 
+# Use a thread-safe queue to receive transcribed words
+transcription_queue = Queue()
 
 def send_asl_transcript(message):
+	"""Callback from gesture processor"""
+	transcription_queue.put(message)
 	if connected_clients > 0:
 		with app.app_context():
 			socketio.emit("asl_transcript", {"message": message}, to=None)
@@ -66,6 +72,12 @@ def get_camera_status():
 
 set_asl_transcript_callback(send_asl_transcript)
 
+# Start gesture processor at startup
+gesture_processor = ThreadSafeGestureProcessor("model/asl_model.h5")
+processor_thread = threading.Thread(
+	target=gesture_processor.process, daemon=True
+)
+processor_thread.start()
 
 # --- Socket Handlers ---
 @socketio.on("host_frame")
@@ -74,6 +86,24 @@ def handle_host_frame(frame_bytes):
 	global frame_byte_q
 	# Store host stream frames in the same buffer as before
 	frame_buffer.append(frame_bytes)
+	
+	# Detect hands and add to gesture processor
+	if sign_active:
+		try:
+			nparr = np.frombuffer(frame_bytes, np.uint8)
+			image = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+			results = hands.process(cv2.cvtColor(image, cv2.COLOR_BGR2RGB))
+			
+			if results.multi_hand_landmarks:
+				gesture_frame = GestureFrame(
+					timestamp=time.time(),
+					hand_landmarks=results.multi_hand_landmarks[0],
+					frame_id=int(time.time() * 1000)
+				)
+				gesture_processor.add_gesture(gesture_frame)
+		except Exception as e:
+			print(f"Hand processing error: {e}")
+
 	# Emit FPS and last frame time to all clients
 	now = time.time()
 	# Calculate FPS based on buffer timestamps (simple approach)

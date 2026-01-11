@@ -26,7 +26,104 @@ from multiprocessing import Process, Queue
 mp_drawing = mp.solutions.drawing_utils
 mp_drawing_styles = mp.solutions.drawing_styles
 mp_hands = mp.solutions.hands
-model = tf.keras.models.load_model("model/asl_model.h5")
+
+# 1. CREATE A CENTRALIZED THREAD-SAFE GESTURE PROCESSOR
+from queue import Queue
+from dataclasses import dataclass
+from typing import Optional
+
+@dataclass
+class GestureFrame:
+    timestamp: float
+    hand_landmarks: list
+    frame_id: int
+
+class ThreadSafeGestureProcessor:
+    def __init__(self, model_path):
+        self.lock = threading.RLock()
+        self.model = tf.keras.models.load_model(model_path)
+        self.gesture_queue = Queue(maxsize=30)
+        self.current_word = ""
+        self.gesture_buffer = []
+        self.last_gesture = None
+        self.silence_threshold = 0.5  # seconds
+        self.last_gesture_time = 0
+        
+    def add_gesture(self, frame: GestureFrame):
+        """Thread-safe gesture addition"""
+        try:
+            self.gesture_queue.put_nowait(frame)
+        except:
+            pass  # Queue full, drop frame
+    
+    def process(self):
+        """Run in dedicated processing thread"""
+        while True:
+            try:
+                frame = self.gesture_queue.get(timeout=1.0)
+                with self.lock:
+                    self._process_landmarks(frame)
+                    self._check_word_boundary()
+            except:
+                with self.lock:
+                    self._check_word_boundary()  # Force boundary on silence
+    
+    def get_transcript(self):
+        """Thread-safe transcript retrieval"""
+        with self.lock:
+            return self.current_word
+    
+    def reset(self):
+        """Thread-safe reset"""
+        with self.lock:
+            self.current_word = ""
+            self.gesture_buffer = []
+
+# 2. SEPARATE FRAME CAPTURE FROM HAND PROCESSING
+# - Frame capture thread: just reads camera frames into a thread-safe buffer
+# - Hand processing thread: reads from buffer, detects hands, predicts letters
+# - Gesture processing thread: accumulates letters into words, sends callbacks
+
+# 3. USE PROPER SYNCHRONIZATION FOR GLOBAL STATE
+# Replace global variables with a thread-safe state manager:
+class AppState:
+    def __init__(self):
+        self.lock = threading.RLock()
+        self._sign_active = True
+        self._connected_clients = 0
+        self._host_logged_in = False
+    
+    @property
+    def sign_active(self):
+        with self.lock:
+            return self._sign_active
+    
+    @sign_active.setter
+    def sign_active(self, value):
+        with self.lock:
+            self._sign_active = value
+    
+    # Similar for other properties...
+
+# 4. IMPROVE WORD BOUNDARY DETECTION
+# Instead of motion tracking (total_x), use:
+# - Gesture duration: If same letter for >500ms, it's a double letter
+# - Silence detection: If no hand detected for >500ms, end word
+# - Space gesture: Define specific gesture as word separator (or use timeout)
+
+# 5. ENHANCE MODEL INTEGRATION
+# Load model in dedicated thread and use thread-safe inference:
+class ThreadSafeModel:
+    def __init__(self, model_path):
+        self.lock = threading.Lock()
+        self.model = tf.keras.models.load_model(model_path)
+        self.graph = tf.compat.v1.get_default_graph()
+    
+    def predict(self, data):
+        with self.lock:
+            with self.graph.as_default():
+                return self.model.predict(data, verbose=0)
+
 
 # Global MediaPipe Hands instance (lazy loaded on first use)
 _hands_detector = None

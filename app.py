@@ -171,7 +171,6 @@ def capture_hands(curr_image):
     global total_x
     global double_letter
     global send
-    # this will be thing that stores all images, placeholder for now
     with mp_hands.Hands(
         static_image_mode=True, max_num_hands=2, min_detection_confidence=0.5
     ) as hands:

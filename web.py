@@ -49,12 +49,9 @@ def check_auth(username, password, role="admin"):
 
 def authenticate(role="admin"):
     realm = "Host Login" if role == "host" else "Login Required"
-    return Response(
-        "Could not verify your access level for that URL.\n"
-        "You have to login with proper credentials",
-        401,
-        {"WWW-Authenticate": f'Basic realm="{realm}"'},
-    )
+    resp = Response(render_template("401.html"), 401)
+    resp.headers["WWW-Authenticate"] = f'Basic realm="{realm}"'
+    return resp
 
 
 def requires_auth(role="admin"):
@@ -292,6 +289,11 @@ def test():
 
 
 # --- Error Handlers ---
+@app.errorhandler(401)
+def unauthorized(error):
+    return render_template("401.html"), 401
+
+
 @app.errorhandler(403)
 def forbidden(error):
     return render_template("403.html"), 403

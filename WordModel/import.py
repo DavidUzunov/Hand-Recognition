@@ -43,5 +43,6 @@ def download_asl_videos(json_file, output_dir="MS-ASL/videos"):
 
 if __name__ == "__main__":
     # Point this to the file extracted by your previous script
-    json_path = "/../Get-Data/MS-ASL/MSASL_train.json"
+    json_path = "../Get-Data/MS-ASL/MSASL_train.json" # this is absolute path for my laptop only
+    print(json_path)
     download_asl_videos(json_path)

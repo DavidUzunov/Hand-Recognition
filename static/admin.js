@@ -2,23 +2,27 @@
 // import './common.js';
 
 // Admin-specific JS
-function getKeyParam() {
-	const url = new URL(window.location.href);
-	return url.searchParams.get('key') || '';
-}
-const adminSocket = io({
-	query: { key: getKeyParam() }
-});
+const adminSocket = io();
 const toggleBtn = document.getElementById('toggle-asl-btn');
 const cameraSelect = document.getElementById('camera_id');
 const transcribeMode = document.getElementById('transcribe-mode');
 const socketStatus = document.getElementById('socket-status');
+const pingTime = document.getElementById('ping-time');
+let lastPing = null;
 
 adminSocket.on('connect', function () {
 	if (socketStatus) socketStatus.textContent = 'Connected';
 });
 adminSocket.on('disconnect', function () {
-	if (socketStatus) socketStatus.textContent = 'Disconnected';
+	if (!socketStatus) socketStatus.textContent = 'Disconnected';
+});
+adminSocket.on('ping', function (data) {
+	if (pingTime && data.timestamp) {
+		const now = Date.now() / 1000;
+		const latency = Math.round((now - data.timestamp) * 1000);
+		pingTime.textContent = latency + ' ms';
+		lastPing = now;
+	}
 });
 
 function setTranscriptionControlsDisabled(disabled) {

@@ -1,0 +1,128 @@
+/* Index-specific CSS */
+
+.video-container {
+	width: 100%;
+	background-color: #000;
+	border-radius: 5px;
+	overflow: hidden;
+	margin-bottom: 20px;
+}
+
+img#video-feed {
+	width: 100%;
+	height: auto;
+	display: block;
+}
+
+#response {
+	margin-top: 15px;
+	font-size: 1.2em;
+	color: #667eea;
+	font-weight: bold;
+}
+
+.status-container {
+	margin-top: 20px;
+	padding: 15px;
+	background-color: #f5f5f5;
+	border-radius: 5px;
+	text-align: left;
+	display: inline-block;
+}
+
+.status-item {
+	margin: 8px 0;
+	font-size: 1em;
+	color: #333;
+}
+
+.status-label {
+	font-weight: bold;
+	color: #667eea;
+}
+
+.controls-section {
+	margin-top: 20px;
+	padding: 15px;
+	background-color: #f9f9f9;
+	border-radius: 5px;
+}
+
+.controls-row {
+	display: flex;
+	flex-direction: row;
+	align-items: center;
+	justify-content: center;
+	gap: 16px;
+}
+
+.transcript-buttons {
+	display: flex;
+	flex-direction: row;
+	gap: 10px;
+	justify-content: flex-end;
+	margin-top: 10px;
+}
+
+.text-output label {
+	font-weight: bold;
+	color: #667eea;
+	font-size: 1.1em;
+	margin: 0;
+}
+
+#share-transcript-button,
+#save-transcript-button,
+#clear-transcript-button {
+	padding: 12px 30px;
+	font-size: 1.1em;
+	min-width: 100px;
+	box-sizing: border-box;
+	border-radius: 5px;
+	border: none;
+	margin: 0;
+	font-family: inherit;
+	font-weight: 500;
+	height: 48px;
+}
+
+#share-transcript-button {
+	background-color: #667eea;
+	color: #fff;
+}
+
+#share-transcript-button:hover {
+	background-color: #4ade80;
+	color: #222;
+}
+
+#save-transcript-button {
+	background-color: #764ba2;
+	color: #fff;
+}
+
+#save-transcript-button:hover {
+	background-color: #4ade80;
+	color: #222;
+}
+
+#clear-transcript-button {
+	background-color: #e74c3c;
+	color: #fff;
+}
+
+#clear-transcript-button:hover {
+	background-color: #c0392b;
+}
+
+.text-output textarea {
+	width: 100%;
+	box-sizing: border-box;
+	border: 2px solid #667eea;
+	border-radius: 5px;
+	padding: 10px;
+	font-family: monospace;
+	font-size: 0.95em;
+	resize: vertical;
+	background-color: white;
+}

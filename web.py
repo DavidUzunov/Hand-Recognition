@@ -17,12 +17,7 @@ from flask import (
 )
 from flask_socketio import SocketIO, emit
 from app import (
-    generate_frames,
     frame_buffer,
-    camera_id,
-    camera_available,
-    start_camera_capture,
-    set_camera_id,
     sign_active,
     set_sign_active,
     create_default_image,
@@ -80,21 +75,12 @@ def send_ping_messages():
 
 
 def get_camera_status():
-    available_cameras = []
-    for video_device in sorted(glob.glob("/dev/video*")):
-        try:
-            device_num = int(video_device.split("video")[1])
-            cap = cv2.VideoCapture(device_num, cv2.CAP_V4L2)
-            if cap.isOpened():
-                available_cameras.append(device_num)
-                cap.release()
-        except (ValueError, IndexError):
-            pass
+    # Only host stream is available
     return {
-        "camera_id": camera_id,
-        "camera_available": camera_available,
-        "device": f"/dev/video{camera_id}" if camera_available else None,
-        "available_cameras": available_cameras,
+        "camera_id": None,
+        "camera_available": len(frame_buffer) > 0,
+        "device": "host_stream" if len(frame_buffer) > 0 else None,
+        "available_cameras": [],
     }
 
 
@@ -104,7 +90,11 @@ set_asl_transcript_callback(send_asl_transcript)
 # --- Socket Handlers ---
 @socketio.on("host_frame")
 def handle_host_frame(frame_bytes):
-    print(f"Received host frame: {len(frame_bytes)} bytes")
+    # Store host stream frames in the same buffer as before
+    frame_buffer.append(frame_bytes)
+    print(
+        f"Received host frame: {len(frame_bytes)} bytes (buffer size: {len(frame_buffer)})"
+    )
     pass
 
 
@@ -165,31 +155,12 @@ def host():
 
 
 # --- Admin Endpoint ---
-@app.route("/admin", methods=["GET", "POST"])
+@app.route("/admin")
 @requires_auth
 def admin():
-    available_cameras = []
-    for video_device in sorted(glob.glob("/dev/video*")):
-        try:
-            device_num = int(video_device.split("video")[1])
-            cap = cv2.VideoCapture(device_num, cv2.CAP_V4L2)
-            if cap.isOpened():
-                available_cameras.append(device_num)
-                cap.release()
-        except (ValueError, IndexError):
-            pass
     status = None
     debug_data = None
-    if request.method == "POST":
-        try:
-            new_id = int(request.form.get("camera_id"))
-            set_camera_id(new_id)
-            start_camera_capture()
-            status = f"Camera switched to /dev/video{new_id}"
-        except Exception as e:
-            status = f"Error: {e}"
     # Get debug info for admin page
-    debug_data = None
     try:
         import threading as thread_module
 
@@ -202,19 +173,6 @@ def admin():
             "total_threads": thread_module.active_count(),
             "current_thread": thread_module.current_thread().name,
             "all_threads": [t.name for t in thread_module.enumerate()],
-        }
-        from app import (
-            capture_thread as app_capture_thread,
-            stop_capture as app_stop_capture,
-        )
-
-        capture_thread_info = {
-            "thread_running": (
-                app_capture_thread is not None and app_capture_thread.is_alive()
-                if app_capture_thread
-                else False
-            ),
-            "stop_capture_flag": app_stop_capture,
         }
         websocket_info = {
             "connected_clients": connected_clients,
@@ -234,7 +192,6 @@ def admin():
             "camera": camera_info,
             "frame_buffer": frame_buffer_info,
             "threads": threads_info,
-            "capture_thread": capture_thread_info,
             "websocket": websocket_info,
             "signing": signing_info,
         }
@@ -242,8 +199,6 @@ def admin():
         debug_data = {"error": str(e)}
     return render_template(
         "admin.html",
-        available_cameras=available_cameras,
-        current_camera=camera_id,
         status=status,
         debug_data=debug_data,
     )
@@ -258,35 +213,6 @@ def hello_world():
 @app.route("/ping")
 def ping():
     return jsonify({"message": "Pong!", "status": "success"})
-
-
-@app.route("/set_camera")
-def set_camera():
-    new_id = request.args.get("id", type=int)
-    if new_id is None:
-        return (
-            jsonify(
-                {
-                    "error": "Camera ID not provided. Use ?id=0, ?id=1, etc.",
-                    "current_camera": camera_id,
-                }
-            ),
-            400,
-        )
-    if new_id < 0:
-        return jsonify({"error": "Camera ID must be >= 0"}), 400
-    old_id = camera_id
-    set_camera_id(new_id)
-    print(f"Switching camera from {old_id} to {camera_id}")
-    start_camera_capture()
-    return jsonify(
-        {
-            "status": "success",
-            "message": f"Camera switched to /dev/video{camera_id}",
-            "previous_camera": old_id,
-            "current_camera": camera_id,
-        }
-    )
 
 
 @app.route("/camera_status")
@@ -316,11 +242,26 @@ def favicon():
     )
 
 
+# Serve the latest host frame as a single JPEG, fallback to no_camera
 @app.route("/video_feed")
 def video_feed():
-    return Response(
-        generate_frames(), mimetype="multipart/x-mixed-replace; boundary=frame"
-    )
+    def gen():
+        import time
+
+        boundary = b"--frame\r\n"
+        while True:
+            if len(frame_buffer) > 0:
+                frame = frame_buffer[-1]
+                yield boundary
+                yield b"Content-Type: image/jpeg\r\n\r\n" + frame + b"\r\n"
+            else:
+                # Wait for a frame
+                time.sleep(0.1)
+
+    if len(frame_buffer) == 0:
+        # No host stream, fallback to no_camera
+        return no_camera()
+    return Response(gen(), mimetype="multipart/x-mixed-replace; boundary=frame")
 
 
 @app.route("/test")
@@ -328,21 +269,7 @@ def test():
     pass
 
 
-@app.route("/upload_frame", methods=["POST"])
-def upload_frame():
-    if "frame" not in request.files:
-        return jsonify({"error": "No frame provided"}), 400
-    frame_file = request.files["frame"]
-    frame_data = frame_file.read()
-    frame_buffer.append(frame_data)
-    print(f"Got image - Buffer size: {len(frame_buffer)}")
-    return jsonify({"status": "success", "buffer_size": len(frame_buffer)})
-
-
 # --- Error Handlers ---
 @app.errorhandler(404)
 def not_found(error):
     return render_template("404.html"), 404
-
-
-# Flask app will be started by bootstrap.py

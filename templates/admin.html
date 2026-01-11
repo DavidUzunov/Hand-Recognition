@@ -4,81 +4,8 @@
 <head>
 	<meta charset="UTF-8">
 	<title>Admin Panel</title>
-	<link rel="stylesheet" href="/static/style.css">
-	<style>
-		.admin-container {
-			width: auto;
-			max-width: none;
-			display: inline-block;
-			margin: 60px auto;
-			background: #fff;
-			padding: 30px;
-			border-radius: 10px;
-			box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
-		}
-
-		.admin-title {
-			font-size: 2em;
-			margin-bottom: 20px;
-			color: #667eea;
-		}
-
-		.admin-label {
-			font-weight: bold;
-			margin-bottom: 10px;
-			display: block;
-		}
-
-		.admin-select {
-			width: 100%;
-			padding: 10px;
-			font-size: 1.1em;
-			border-radius: 5px;
-			border: 2px solid #667eea;
-			margin-bottom: 20px;
-		}
-
-		.admin-btn {
-			padding: 10px 30px;
-			font-size: 1.1em;
-			background: #667eea;
-			color: #fff;
-			border: none;
-			border-radius: 5px;
-			cursor: pointer;
-		}
-
-		.admin-btn:hover {
-			background: #4ade80;
-			color: #222;
-		}
-
-		.admin-status {
-			margin-top: 15px;
-			font-size: 1.1em;
-		}
-
-		.admin-no-cameras {
-			color: #e74c3c;
-			font-weight: bold;
-			margin-bottom: 20px;
-		}
-
-		.admin-debug {
-			margin-top: 20px;
-			font-size: 0.9em;
-			background: #f7f7f9;
-			padding: 10px;
-			border-radius: 5px;
-			border: 1px solid #ddd;
-		}
-
-		.admin-debug pre {
-			margin: 0;
-			padding: 0;
-			font-family: monospace;
-		}
-	</style>
+	<link rel="stylesheet" href="/static/common.css">
+	<link rel="stylesheet" href="/static/admin.css">
 </head>
 
 <body>
@@ -92,7 +19,7 @@
 			<span id="selected-camera" class="header-value">-</span>
 		</div>
 		<div class="header-item">
-			<span class="header-label">Signing:</span>
+			<span class="header-label">Transcription:</span>
 			<span id="signing-status" class="header-value">Inactive</span>
 		</div>
 	</header>
@@ -107,22 +34,6 @@
 					<option value="words">Words</option>
 					<option value="characters">Characters</option>
 				</select>
-				<div class="camera-selector"
-					style="display: flex; gap: 12px; align-items: center; justify-content: center;">
-					{% if available_cameras %}
-					<select id="camera_id" name="camera_id">
-						{% for cam in available_cameras %}
-						<option value="{{ cam }}" {% if cam==current_camera %}selected{% endif %}>/dev/video{{ cam }}
-						</option>
-						{% endfor %}
-					</select>
-					<button class="admin-btn" type="submit">Change Camera</button>
-					{% else %}
-					<select id="camera_id" name="camera_id" disabled>
-						<option>No cameras detected</option>
-					</select>
-					{% endif %}
-				</div>
 			</div>
 		</form>
 		{% if status %}
@@ -153,7 +64,8 @@
 		</div>
 	</footer>
 	<script src="https://cdn.socket.io/4.8.3/socket.io.min.js"></script>
-	<script src="/static/app.js"></script>
+	<script type="module" src="/static/common.js"></script>
+	<script type="module" src="/static/admin.js"></script>
 	<script>
 		// Use a unique variable for admin socket to avoid conflicts
 		const adminSocket = io();

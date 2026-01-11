@@ -7,8 +7,11 @@
 	<title>Signly</title>
 	<link rel="preconnect" href="https://cdn.socket.io" crossorigin>
 	<link rel="prefetch" href="/no_camera">
-	<link rel="stylesheet" href="/static/style.css">
+	<link rel="stylesheet" href="/static/common.css">
+	<link rel="stylesheet" href="/static/index.css">
 	<script src="https://cdn.socket.io/4.8.3/socket.io.min.js"></script>
+	<script type="module" src="/static/common.js"></script>
+	<script type="module" src="/static/index.js"></script>
 </head>
 
 <body>
@@ -36,7 +39,8 @@
 		<div class="content-wrapper">
 			<div class="main-content">
 				<div class="video-container">
-					<img id="video-feed" alt="Live Camera Feed">
+					<img id="video-feed" alt="Live Camera Feed" src="/video_feed"
+						onerror="this.onerror=null;this.src='/no_camera';">
 				</div>
 				<button id="ping-button" onclick="pingServer()" style="display:none;">Ping Server</button>
 				<div id="response"></div>
@@ -78,8 +82,6 @@
 			<span id="last-frame-time" class="footer-value">-</span>
 		</div>
 	</footer>
-
-	<script src="/static/app.js"></script>
 </body>
 
 </html>

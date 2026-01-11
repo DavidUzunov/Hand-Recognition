@@ -31,14 +31,8 @@ def get_hands_detector():
 # Memory buffer to store frames (max 30 frames)
 frame_buffer = deque(maxlen=30)  # JPG bytes
 
-# Global variables for video capture
-cap = None
-current_frame = None  # JPG
-frame_lock = threading.Lock()
-camera_available = False
-camera_id = 0  # Default camera ID
-capture_thread = None
-stop_capture = False
+
+# Only keep sign_active for state
 sign_active = False  # Track if hand signing capture is active
 
 # Global variables for hand-tracking/transcribing
@@ -49,41 +43,37 @@ curr_x = 0
 double_letter = False
 curr_letter = ""
 last_letter = ""
-LETTERS = ["A", 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z']
+LETTERS = [
+    "A",
+    "B",
+    "C",
+    "D",
+    "E",
+    "F",
+    "G",
+    "H",
+    "I",
+    "J",
+    "K",
+    "L",
+    "M",
+    "N",
+    "O",
+    "P",
+    "Q",
+    "R",
+    "S",
+    "T",
+    "U",
+    "V",
+    "W",
+    "X",
+    "Y",
+    "Z",
+]
 
 
-def detect_available_cameras():
-    """Detect available camera devices and return list of camera IDs"""
-    available_cameras = []
-    # Check /dev/video* devices on Linux
-    for video_device in sorted(glob.glob("/dev/video*")):
-        try:
-            device_num = int(video_device.split("video")[1])
-            cap = cv2.VideoCapture(device_num, cv2.CAP_V4L2)
-            if cap.isOpened():
-                available_cameras.append(device_num)
-                cap.release()
-        except (ValueError, IndexError):
-            pass
-    return available_cameras
-
-
-def set_default_camera():
-    """Set camera_id to first available camera, or 0 if none available"""
-    global camera_id
-    available = detect_available_cameras()
-    if available:
-        camera_id = available[0]
-        print(
-            f"Found {len(available)} camera(s). Using camera {camera_id} (/dev/video{camera_id})"
-        )
-        if len(available) > 1:
-            print(
-                f"Other cameras available: {[f'/dev/video{c}' for c in available[1:]]}"
-            )
-    else:
-        camera_id = 0
-        print("No cameras detected. Using default camera_id=0")
+# Remove camera detection logic
 
 
 last_x = 0
@@ -138,142 +128,13 @@ def create_default_image():
 default_image = create_default_image()
 
 
-def capture_frames():
-    """Continuously capture frames from USB webcam (Raspberry Pi compatible)"""
-    global cap, current_frame, camera_available, camera_id, stop_capture
-
-    # Try to open USB camera with selected ID
-    cap = cv2.VideoCapture(
-        camera_id, cv2.CAP_V4L2
-    )  # Use V4L2 backend for better Raspberry Pi USB camera support
-
-    # Give the camera time to initialize
-    time.sleep(0.5)
-
-    # Check if camera is available
-    if not cap.isOpened():
-        print(
-            f"WARNING: No USB camera detected on /dev/video{camera_id}. Using default image."
-        )
-        camera_available = False
-        with frame_lock:
-            current_frame = default_image.copy()
-        cap.release()
-    else:
-        camera_available = True
-        # Set camera properties optimized for Raspberry Pi USB cameras
-        cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1280)
-        cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 720)
-        cap.set(cv2.CAP_PROP_FPS, 15)
-        cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)  # Minimize latency
-        print("USB camera detected and initialized successfully on Raspberry Pi.")
-
-    while True:
-        if camera_available:
-            ret, frame = cap.read()
-            if not ret:
-                print("Failed to read frame from camera. Switching to default image.")
-                camera_available = False
-                with frame_lock:
-                    current_frame = default_image.copy()
-                break
-
-            # Check if we should stop capturing
-            if stop_capture:
-                print("Stopping camera capture...")
-                break
-
-            with frame_lock:
-                current_frame = frame.copy()
-                # Store frame in buffer
-                _, jpeg = cv2.imencode(".jpg", frame)
-                frame_buffer.append(jpeg.tobytes())
-                print(f"Got image - Buffer size: {len(frame_buffer)}")
-        else:
-            # If no camera, just keep the default image
-            with frame_lock:
-                current_frame = default_image.copy()
-            time.sleep(0.1)
-
-    if cap is not None:
-        cap.release()
+# Remove camera capture logic
 
 
-def generate_frames():
-    """Generate frames for streaming and optionally process hands"""
-    hands = get_hands_detector()
-
-    while True:
-        with frame_lock:
-            # Use default image if current_frame is None or camera is not available
-            frame_to_send = (
-                current_frame if current_frame is not None else default_image
-            )
-            frame_to_process = frame_to_send.copy()
-            is_default_image = not camera_available
-
-        # Process hand detection if signing is active
-        if sign_active and frame_to_process is not None and not is_default_image:
-            try:
-                # Convert BGR to RGB for MediaPipe
-                frame_rgb = cv2.cvtColor(frame_to_process, cv2.COLOR_BGR2RGB)
-                results = hands.process(frame_rgb)
-
-                # Draw hand landmarks if detected
-                if results.multi_hand_landmarks:
-                    for hand_landmarks in results.multi_hand_landmarks:
-                        mp_drawing.draw_landmarks(
-                            frame_to_process,
-                            hand_landmarks,
-                            mp_hands.HAND_CONNECTIONS,
-                            mp_drawing_styles.get_default_hand_landmarks_style(),
-                            mp_drawing_styles.get_default_hand_connections_style(),
-                        )
-                    # Update frame_to_send with drawn landmarks
-                    frame_to_send = frame_to_process
-            except Exception as e:
-                print(f"Error processing hand landmarks: {e}")
-
-        _, jpeg = cv2.imencode(".jpg", frame_to_send)
-        frame_bytes = jpeg.tobytes()
-
-        yield (
-            b"--frame\r\n"
-            b"Content-Type: image/jpeg\r\n"
-            b"Content-Length: "
-            + str(len(frame_bytes)).encode()
-            + b"\r\n\r\n"
-            + frame_bytes
-            + b"\r\n"
-        )
-
-        # Add delay - 1 second for default image, ~30fps for camera feed
-        if is_default_image:
-            time.sleep(0.1)  # 1 second delay for default image
-        else:
-            time.sleep(0.033)  # ~30 fps for camera feed
-    hands.close()
+# Remove frame generation logic (handled by host stream now)
 
 
-def start_camera_capture():
-    """Start or restart camera capture thread"""
-    global capture_thread, stop_capture
-
-    # Stop existing thread if running
-    if capture_thread and capture_thread.is_alive():
-        stop_capture = True
-        capture_thread.join(timeout=2.0)
-        stop_capture = False
-
-    # Start new capture thread
-    capture_thread = threading.Thread(target=capture_frames, daemon=True)
-    capture_thread.start()
-
-
-def set_camera_id(new_id):
-    """Set the camera ID"""
-    global camera_id
-    camera_id = new_id
+# Remove camera thread and set_camera_id logic
 
 
 def set_sign_active(active):
@@ -284,6 +145,7 @@ def set_sign_active(active):
 
 def transcribe(letter, double_letter, send):
     # this will transcribe letters
+    global curr_word
     if letter == " ":
         return
     else:
@@ -297,7 +159,7 @@ def transcribe(letter, double_letter, send):
 
 def process_hand_data(hand):
     data_list = []
-    # normalizes the data via the wrist for better model processing
+    # normalizes the data via the wrist for better model processing (wrist is (0,0,0))
     for measurement in hand.landmark:
         data_list.append(measurement.x - hand.landmark[0].x)
         data_list.append(measurement.y - hand.landmark[0].y)
@@ -306,16 +168,24 @@ def process_hand_data(hand):
 
 
 def get_letter(data):
-    prediction = model.predict(data, verbose = 0)
-    id = np.argmax(p)
+    global curr_letter
+    prediction = model.predict(data, verbose=0)
+    id = np.argmax(prediction)
+    curr_letter = LETTERS[id]
+
 
 def capture_hands(curr_image):
+    global last_letter
+    global curr_letter
+    global last_x
+    global total_x
+    global double_letter
+    global send
     # this will be thing that stores all images, placeholder for now
     with mp_hands.Hands(
         static_image_mode=True, max_num_hands=2, min_detection_confidence=0.5
     ) as hands:
-        # Read an image, flip it around y-axis for correct handedness output (see
-        # above).
+        # Read an image, flip it around y-axis for correct handedness output
         image = cv2.flip(cv2.imread(curr_image), 1)
         # Convert the BGR image to RGB before processing.
         results = hands.process(cv2.cvtColor(image, cv2.COLOR_BGR2RGB))
@@ -328,13 +198,13 @@ def capture_hands(curr_image):
         if curr_letter != last_letter:
             if total_x >= 0.15:
                 double_letter = True
-            last_x = 0
-            total_x = 0
-            if curr_letter == " ":
+            if curr_letter.isspace() == True:
                 send = True
             if last_letter.isspace() == False:
                 curr_letter = curr_letter.lower()
             transcribe(curr_letter, double_letter, send)
+            last_x = 0
+            total_x = 0
             double_letter = False
             last_letter = curr_letter
         # checks for double letters via wrist data

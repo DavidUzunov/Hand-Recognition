@@ -4,7 +4,8 @@
 <head>
 	<meta charset="UTF-8">
 	<title>Signly Host</title>
-	<link rel="stylesheet" href="/static/style.css">
+	<link rel="stylesheet" href="/static/common.css">
+	<link rel="stylesheet" href="/static/host.css">
 	<style>
 		.host-container {
 			width: auto;
@@ -68,8 +69,17 @@
 	</header>
 	<div class="host-container">
 		<div class="host-title">Signly Host</div>
-		<video id="host-video" autoplay playsinline muted></video>
-		<div id="host-status">Initializing camera...</div>
+		<div id="camera-select-section" style="margin-bottom: 20px; text-align: center;">
+			<select id="camera-select"
+				style="padding: 8px 15px; font-size: 1em; border: 2px solid #667eea; border-radius: 5px;"></select>
+			<button id="start-camera-btn" class="admin-btn" style="margin-left: 10px;">Start Camera</button>
+			<div style="margin-top: 16px;">
+				<video id="camera-preview" width="320" height="240" autoplay playsinline muted
+					style="border-radius: 8px; background: #000; display: none;"></video>
+			</div>
+		</div>
+		<video id="host-video" autoplay playsinline muted style="display:none;"></video>
+		<div id="host-status">Please select a camera to start.</div>
 	</div>
 	<footer class="status-footer">
 		<div class="footer-item">
@@ -82,7 +92,8 @@
 		</div>
 	</footer>
 	<script src="https://cdn.socket.io/4.8.3/socket.io.min.js"></script>
-	<script src="/static/host.js"></script>
+	<script type="module" src="/static/common.js"></script>
+	<script type="module" src="/static/host.js"></script>
 </body>
 
 </html>

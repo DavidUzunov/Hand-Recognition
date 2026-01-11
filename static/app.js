@@ -1,3 +1,21 @@
+function saveTranscript() {
+	const messageBox = document.getElementById('message-box');
+	if (!messageBox || !messageBox.value) {
+		console.log('No transcript to save');
+		return;
+	}
+	const blob = new Blob([messageBox.value], { type: 'text/plain' });
+	const url = URL.createObjectURL(blob);
+	const a = document.createElement('a');
+	a.href = url;
+	a.download = 'translation.txt';
+	document.body.appendChild(a);
+	a.click();
+	setTimeout(() => {
+		document.body.removeChild(a);
+		URL.revokeObjectURL(url);
+	}, 100);
+}
 const socket = io();
 
 // Metrics tracking
@@ -75,37 +93,41 @@ socket.on('asl_transcript', (data) => {
 function updateCameraStatus(data) {
 	try {
 		const videoFeed = document.getElementById('video-feed');
-
-		// Load video feed when camera is available, otherwise show placeholder
-		if (data.camera_available) {
-			videoFeed.src = '/video_feed';
-			// Start FPS tracking when video feed loads
-			startFpsTracking();
-		} else {
-			videoFeed.src = '/no_camera';
-			stopFpsTracking();
+		if (videoFeed) {
+			// Load video feed when camera is available, otherwise show placeholder
+			if (data.camera_available) {
+				videoFeed.src = '/video_feed';
+				// Start FPS tracking when video feed loads
+				startFpsTracking();
+			} else {
+				videoFeed.src = '/no_camera';
+				stopFpsTracking();
+			}
 		}
-
-		// Populate camera selector with available cameras
+		// Only update camera selector if it exists (admin page)
 		const cameraSelect = document.getElementById('camera-select');
-		cameraSelect.innerHTML = '';
-
-		if (data.available_cameras && data.available_cameras.length > 0) {
-			data.available_cameras.forEach(cameraId => {
-				const option = document.createElement('option');
-				option.value = cameraId;
-				option.textContent = `/dev/video${cameraId}`;
-				if (cameraId === data.camera_id) {
-					option.selected = true;
-				}
-				cameraSelect.appendChild(option);
-			});
-		} else {
-			cameraSelect.innerHTML = '<option value="">No cameras available</option>';
+		if (cameraSelect) {
+			cameraSelect.innerHTML = '';
+			if (data.available_cameras && data.available_cameras.length > 0) {
+				data.available_cameras.forEach(cameraId => {
+					const option = document.createElement('option');
+					option.value = cameraId;
+					option.textContent = `/dev/video${cameraId}`;
+					if (cameraId === data.camera_id) {
+						option.selected = true;
+					}
+					cameraSelect.appendChild(option);
+				});
+			} else {
+				cameraSelect.innerHTML = '<option value="">No cameras available</option>';
+			}
 		}
 	} catch (error) {
 		console.error('Error updating camera status:', error);
-		document.getElementById('camera-select').innerHTML = '<option value="">Error loading cameras</option>';
+		const cameraSelect = document.getElementById('camera-select');
+		if (cameraSelect) {
+			cameraSelect.innerHTML = '<option value="">Error loading cameras</option>';
+		}
 	}
 }
 
@@ -195,16 +217,17 @@ async function getSignStatus() {
 
 function updateSignButton(isActive) {
 	const button = document.getElementById('sign-button');
+	if (!button) return;
 	const sidebar = document.getElementById('transcript-sidebar');
 	const container = document.querySelector('.container');
 
 	if (isActive) {
-		button.textContent = 'Stop Signing';
+		button.textContent = 'Stop ASL Recognition';
 		button.classList.add('active');
 		if (sidebar) sidebar.style.display = 'flex';
 		if (container) container.classList.add('expanded');
 	} else {
-		button.textContent = 'Start Signing';
+		button.textContent = 'Start ASL Recognition';
 		button.classList.remove('active');
 		if (sidebar) sidebar.style.display = 'none';
 		if (container) container.classList.remove('expanded');
@@ -270,6 +293,37 @@ function checkDebugMode() {
 		}
 	}
 }
+
+// Transcript sidebar toggle logic
+window.addEventListener('DOMContentLoaded', () => {
+	const toggleBtn = document.getElementById('toggle-transcript');
+	const sidebar = document.getElementById('transcript-sidebar');
+	const container = document.querySelector('.container');
+	let sidebarVisible = false;
+	function updateSidebar() {
+		if (sidebarVisible) {
+			sidebar.style.display = 'block';
+			container.classList.add('expanded');
+			toggleBtn.innerHTML = '&#171;'; // «
+			toggleBtn.title = 'Hide transcript';
+		} else {
+			sidebar.style.display = 'none';
+			container.classList.remove('expanded');
+			toggleBtn.innerHTML = '&#187;'; // »
+			toggleBtn.title = 'Show transcript';
+		}
+		toggleBtn.style.display = 'block';
+	}
+	if (toggleBtn && sidebar && container) {
+		toggleBtn.addEventListener('click', (e) => {
+			e.stopPropagation();
+			sidebarVisible = !sidebarVisible;
+			updateSidebar();
+		});
+		sidebarVisible = false;
+		updateSidebar();
+	}
+});
 
 // Load sign status when page loads
 window.addEventListener('load', () => {

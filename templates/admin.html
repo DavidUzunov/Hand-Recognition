@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+	<meta charset="UTF-8">
+	<title>Admin Panel</title>
+	<link rel="stylesheet" href="/static/style.css">
+	<style>
+		.admin-container {
+			width: auto;
+			max-width: none;
+			display: inline-block;
+			margin: 60px auto;
+			background: #fff;
+			padding: 30px;
+			border-radius: 10px;
+			box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+		}
+
+		.admin-title {
+			font-size: 2em;
+			margin-bottom: 20px;
+			color: #667eea;
+		}
+
+		.admin-label {
+			font-weight: bold;
+			margin-bottom: 10px;
+			display: block;
+		}
+
+		.admin-select {
+			width: 100%;
+			padding: 10px;
+			font-size: 1.1em;
+			border-radius: 5px;
+			border: 2px solid #667eea;
+			margin-bottom: 20px;
+		}
+
+		.admin-btn {
+			padding: 10px 30px;
+			font-size: 1.1em;
+			background: #667eea;
+			color: #fff;
+			border: none;
+			border-radius: 5px;
+			cursor: pointer;
+		}
+
+		.admin-btn:hover {
+			background: #4ade80;
+			color: #222;
+		}
+
+		.admin-status {
+			margin-top: 15px;
+			font-size: 1.1em;
+		}
+
+		.admin-no-cameras {
+			color: #e74c3c;
+			font-weight: bold;
+			margin-bottom: 20px;
+		}
+
+		.admin-debug {
+			margin-top: 20px;
+			font-size: 0.9em;
+			background: #f7f7f9;
+			padding: 10px;
+			border-radius: 5px;
+			border: 1px solid #ddd;
+		}
+
+		.admin-debug pre {
+			margin: 0;
+			padding: 0;
+			font-family: monospace;
+		}
+	</style>
+</head>
+
+<body>
+	<header class="status-header">
+		<div class="header-item">
+			<span class="header-label">Camera:</span>
+			<span id="camera-status-header" class="header-value">Unknown</span>
+		</div>
+		<div class="header-item">
+			<span class="header-label">Selected:</span>
+			<span id="selected-camera" class="header-value">-</span>
+		</div>
+		<div class="header-item">
+			<span class="header-label">Signing:</span>
+			<span id="signing-status" class="header-value">Inactive</span>
+		</div>
+	</header>
+	<div class="admin-container">
+		<div class="admin-title">Signly Admin</div>
+		<form method="POST" onsubmit="return false;">
+			<div class="admin-controls"
+				style="margin-bottom: 18px; display: flex; gap: 16px; align-items: center; justify-content: center;">
+				<button class="admin-btn" type="button" id="toggle-asl-btn">Start ASL Transcription</button>
+				<select id="transcribe-mode" name="transcribe_mode"
+					style="padding: 8px 15px; font-size: 1em; border: 2px solid #667eea; border-radius: 5px;">
+					<option value="words">Words</option>
+					<option value="characters">Characters</option>
+				</select>
+				<div class="camera-selector"
+					style="display: flex; gap: 12px; align-items: center; justify-content: center;">
+					{% if available_cameras %}
+					<select id="camera_id" name="camera_id">
+						{% for cam in available_cameras %}
+						<option value="{{ cam }}" {% if cam==current_camera %}selected{% endif %}>/dev/video{{ cam }}
+						</option>
+						{% endfor %}
+					</select>
+					<button class="admin-btn" type="submit">Change Camera</button>
+					{% else %}
+					<select id="camera_id" name="camera_id" disabled>
+						<option>No cameras detected</option>
+					</select>
+					{% endif %}
+				</div>
+			</div>
+		</form>
+		{% if status %}
+		<div class="admin-status">{{ status }}</div>
+		{% endif %}
+		{% if debug_data %}
+		<div class="admin-debug">
+			<strong>Debug Info:</strong>
+			<pre>{{ debug_data | tojson(indent=2) }}</pre>
+		</div>
+		{% endif %}
+	</div>
+	<footer class="status-footer">
+		<div class="footer-item">
+			<span class="footer-label">Socket:</span>
+			<span id="socket-status" class="footer-value">Disconnected</span>
+		</div>
+		<div class="footer-item">
+			<span class="footer-label">Ping:</span>
+			<span id="ping-time" class="footer-value">-</span>
+		</div>
+		<div class="footer-item">
+			<span class="footer-label">FPS:</span>
+			<span id="fps-counter" class="footer-value">0</span>
+		</div>
+		<div class="footer-item">
+			<span class="footer-label">Last Frame:</span>
+			<span id="last-frame-time" class="footer-value">-</span>
+		</div>
+	</footer>
+	<script src="https://cdn.socket.io/4.8.3/socket.io.min.js"></script>
+	<script src="/static/app.js"></script>
+	<script>
+		// Use a unique variable for admin socket to avoid conflicts
+		const adminSocket = io();
+		const toggleBtn = document.getElementById('toggle-asl-btn');
+		const cameraSelect = document.getElementById('camera_id');
+		const transcribeMode = document.getElementById('transcribe-mode');
+
+		function setTranscriptionControlsDisabled(disabled) {
+			if (cameraSelect) cameraSelect.disabled = disabled;
+			if (transcribeMode) transcribeMode.disabled = disabled;
+			const changeBtn = document.querySelector('.camera-selector button[type="submit"]');
+			if (changeBtn) changeBtn.disabled = disabled;
+		}
+
+		adminSocket.on('sign_status', function (data) {
+			if (toggleBtn) {
+				toggleBtn.textContent = data.signing_active ? 'Stop ASL Transcription' : 'Start ASL Transcription';
+			}
+			setTranscriptionControlsDisabled(!!data.signing_active);
+		});
+		if (toggleBtn) {
+			toggleBtn.addEventListener('click', function () {
+				adminSocket.emit('toggle_sign');
+			});
+		}
+		adminSocket.emit('get_sign_status');
+	</script>
+</body>
+
+</html>

@@ -40,26 +40,22 @@
 				</div>
 				<button id="ping-button" onclick="pingServer()" style="display:none;">Ping Server</button>
 				<div id="response"></div>
-				<div class="camera-selector">
-					<label for="camera-select">Select Camera:</label>
-					<select id="camera-select" onchange="changeCamera()">
-						<option value="">Loading cameras...</option>
-					</select>
-				</div>
-				<div class="controls-section">
-					<button id="sign-button" onclick="toggleSign()">Start Signing</button>
+				<div class="controls-section controls-row" style="justify-content: center; background: white;">
+					<button id="sign-button" onclick="toggleSign()">Start ASL Recognition</button>
+					<div class="controls-right" style="flex: 1; display: flex; justify-content: flex-end;">
+						<button id="toggle-transcript" class="toggle-transcript"
+							title="Show/hide transcript">&#187;</button>
+					</div>
 				</div>
 			</div>
 			<div id="transcript-sidebar" class="sidebar">
 				<div class="text-output">
-					<div class="transcript-header">
-						<label for="message-box">ASL Transcript:</label>
-						<div class="header-buttons">
-							<button id="share-transcript-button" onclick="shareTranscript()">Share</button>
-							<button id="clear-transcript-button" onclick="clearTranscript()">Clear</button>
-						</div>
-					</div>
 					<textarea id="message-box" readonly rows="25" cols="40"></textarea>
+					<div class="transcript-buttons">
+						<button id="share-transcript-button" onclick="shareTranscript()">Share</button>
+						<button id="save-transcript-button" onclick="saveTranscript()">Save</button>
+						<button id="clear-transcript-button" onclick="clearTranscript()">Clear</button>
+					</div>
 				</div>
 			</div>
 		</div>

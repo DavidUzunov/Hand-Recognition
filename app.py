@@ -20,6 +20,7 @@ import numpy as np
 import threading
 import time
 import glob
+import glob
 
 # (mp_drawing, mp_drawing_styles, mp_hands) already set above
 
@@ -40,6 +41,59 @@ model_frame = None
 asl_transcript_callback = None
 inference_thread = None
 inference_stop = False
+
+# Global variables for hand-tracking/transcribing
+curr_word = ""
+last_x = 0
+total_x = 0
+curr_x = 0
+double_letter = False
+
+
+def detect_available_cameras():
+	"""Detect available camera devices and return list of camera IDs"""
+	available_cameras = []
+	# Check /dev/video* devices on Linux
+	for video_device in sorted(glob.glob("/dev/video*")):
+		try:
+			device_num = int(video_device.split("video")[1])
+			cap = cv2.VideoCapture(device_num, cv2.CAP_V4L2)
+			if cap.isOpened():
+				available_cameras.append(device_num)
+				cap.release()
+		except (ValueError, IndexError):
+			pass
+	return available_cameras
+
+
+def set_default_camera():
+	"""Set camera_id to first available camera, or 0 if none available"""
+	global camera_id
+	available = detect_available_cameras()
+	if available:
+		camera_id = available[0]
+		print(f"Found {len(available)} camera(s). Using camera {camera_id} (/dev/video{camera_id})")
+		if len(available) > 1:
+			print(f"Other cameras available: {[f'/dev/video{c}' for c in available[1:]]}")
+	else:
+		camera_id = 0
+		print("No cameras detected. Using default camera_id=0")
+
+last_x = 0
+total_x = 0
+curr_x = 0
+double_letter = False
+curr_letter = "a" # placeholder value --> will store actual current letter
+last_letter = "b" # ditto
+
+# Callback function for sending ASL transcript (set by web.py to avoid circular import)
+asl_transcript_callback = None
+
+
+def set_asl_transcript_callback(callback):
+	"""Set the callback function for sending ASL transcripts"""
+	global asl_transcript_callback
+	asl_transcript_callback = callback
 
 
 def create_default_image():
@@ -261,9 +315,7 @@ def generate_frames():
 			time.sleep(0.1)  # 1 second delay for default image
 		else:
 			time.sleep(0.033)  # ~30 fps for camera feed
-
-	if hands is not None:
-		hands.close()
+	hands.close()
 
 
 def start_camera_capture():
@@ -394,68 +446,55 @@ def double_letter_tracking(hand_landmarks, last_x, total_x):
 	curr_x = hand_landmarks.landmark[mp_hands.HandLandmark.WRIST].x
 	total_x = total_x + (curr_x - last_x)
 
-def transcribe():
+def transcribe(letter, double_letter, send):
 	# this will transcribe letters
-	dummy = "dingus"
+	if letter == " ":
+		return
+	else:
+		curr_word = curr_word + letter
+		if double_letter == True:
+			curr_word = curr_word + letter
+		if send == True:
+			if asl_transcript_callback is not None:
+				asl_transcript_callback(curr_word)
 
-def capture_hands():
+def capture_hands(curr_image):
 	# this will be thing that stores all images, placeholder for now
-	last_x = 0
-	total_x = 0
-	curr_x = 0
 	double_letter = False
-	IMAGES = []
 	with mp_hands.Hands(
 		static_image_mode=True, max_num_hands=2, min_detection_confidence=0.5
 	) as hands:
-		for idx, file in enumerate(IMAGES):
-			# Read an image, flip it around y-axis for correct handedness output (see
-			# above).
-			image = cv2.flip(cv2.imread(file), 1)
-			# Convert the BGR image to RGB before processing.
-			results = hands.process(cv2.cvtColor(image, cv2.COLOR_BGR2RGB))
-
-			# Print handedness and draw hand landmarks on the image.
-			print("Handedness:", results.multi_handedness)
-			if not results.multi_hand_landmarks:
-				return
-			image_height, image_width, _ = image.shape
-			annotated_image = image.copy()
-			for hand_landmarks in results.multi_hand_landmarks:
-				print("hand_landmarks:", hand_landmarks)
-				print(
-					f"Index finger tip coordinates: (",
-					f"{hand_landmarks.landmark[mp_hands.HandLandmark.INDEX_FINGER_TIP].x * image_width}, "
-					f"{hand_landmarks.landmark[mp_hands.HandLandmark.INDEX_FINGER_TIP].y * image_height})",
-				)
-				mp_drawing.draw_landmarks(
-					annotated_image,
-					hand_landmarks,
-					mp_hands.HAND_CONNECTIONS,
-					mp_drawing_styles.get_default_hand_landmarks_style(),
-					mp_drawing_styles.get_default_hand_connections_style(),
-				)
-			cv2.imwrite(
-				"/tmp/annotated_image" + str(idx) + ".png", cv2.flip(annotated_image, 1)
+		# Read an image, flip it around y-axis for correct handedness output (see
+		# above).
+		image = cv2.flip(cv2.imread(curr_image), 1)
+		# Convert the BGR image to RGB before processing.
+		results = hands.process(cv2.cvtColor(image, cv2.COLOR_BGR2RGB))
+		if not results.multi_hand_landmarks:
+			return
+		hand = results.multi_hand_landmarks[0]
+		# Print handedness
+		print("Handedness:", results.multi_handedness)
+		image_height, image_width, _ = image.shape
+		for hand_landmarks in results.multi_hand_landmarks:
+			print("hand_landmarks:", hand_landmarks)
+			print(
+				f"Index finger tip coordinates: (",
+				f"{hand_landmarks.landmark[mp_hands.HandLandmark.INDEX_FINGER_TIP].x * image_width}, "
+				f"{hand_landmarks.landmark[mp_hands.HandLandmark.INDEX_FINGER_TIP].y * image_height})",
 			)
-			# Draw hand world landmarks.
-			if not results.multi_hand_world_landmarks:
-				return
-			for hand_world_landmarks in results.multi_hand_world_landmarks:
-				mp_drawing.plot_landmarks(
-					hand_world_landmarks, mp_hands.HAND_CONNECTIONS, azimuth=5
-				)
-			curr_letter = "a" # placeholder value --> will store actual current letter
-			last_letter = "b" # ditto
-			if curr_letter != last_letter:
-				if total_x >= 0.15:
-					double_letter = True
-				last_x = 0
-				total_x = 0
-				transcribe(last_letter, double_letter)
-				double_letter = False
-			# checks for double letters
-			curr_x = results.multi_hand_landmarks[mp_hands.HandLandmark.WRIST].x
-			if curr_letter == last_letter:
-				double_letter_tracking(hand_landmarks, last_x, curr_x)
-			curr_x = 0
+		send = False
+		if curr_letter != last_letter:
+			if total_x >= 0.15 * image_width:
+				double_letter = True
+			last_x = 0
+			total_x = 0
+			if curr_letter == " ":
+				send = True
+			transcribe(last_letter, double_letter, send)
+			double_letter = False
+			last_letter = curr_letter
+		# checks for double letters
+		curr_x = results.multi_hand_landmarks[mp_hands.HandLandmark.WRIST].x * image_width
+		if curr_letter == last_letter:
+			double_letter_tracking(hand_landmarks, last_x, curr_x)
+		curr_x = 0

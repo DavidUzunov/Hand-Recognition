@@ -45,6 +45,10 @@ def main():
 	signal.signal(signal.SIGINT, shutdown_handler)
 	signal.signal(signal.SIGTERM, shutdown_handler)
 
+	# Auto-detect available cameras and set default
+	print("Detecting available cameras...")
+	app_module.set_default_camera()
+
 	# Initialize camera capture
 	print("Initializing camera capture...")
 	start_camera_capture()

@@ -18,28 +18,27 @@ socket.on('sign_status', (data) => {
 	updateSignButton(data.signing_active);
 });
 
+socket.on('asl_transcript', (data) => {
+	console.log('Received ASL transcript:', data.message);
+	const messageBox = document.getElementById('message-box');
+	if (messageBox) {
+		const timestamp = new Date().toLocaleTimeString();
+		messageBox.value += `[${timestamp}] ${data.message}\n`;
+		// Auto-scroll to bottom
+		messageBox.scrollTop = messageBox.scrollHeight;
+	}
+});
+
 function updateCameraStatus(data) {
 	try {
-		const statusDiv = document.getElementById('camera-status');
 		const videoFeed = document.getElementById('video-feed');
 
-		// Build status HTML conditionally
-		let statusHTML = '<div class="status-item"><span class="status-label">Status:</span> ';
-		statusHTML += `<span style="color: ${data.camera_available ? 'green' : 'red'}">`;
-		statusHTML += `${data.camera_available ? '✓ Available' : '✗ Not Available'}</span></div>`;
-
-		// Only show camera ID and device if camera is available
+		// Load video feed when camera is available, otherwise show placeholder
 		if (data.camera_available) {
-			statusHTML += `<div class="status-item"><span class="status-label">Camera ID:</span> ${data.camera_id}</div>`;
-			statusHTML += `<div class="status-item"><span class="status-label">Device:</span> ${data.device}</div>`;
-			// Load video feed when camera is available
 			videoFeed.src = '/video_feed';
 		} else {
-			// Show "camera not available" placeholder
 			videoFeed.src = '/no_camera';
 		}
-
-		statusDiv.innerHTML = statusHTML;
 
 		// Populate camera selector with available cameras
 		const cameraSelect = document.getElementById('camera-select');
@@ -60,7 +59,6 @@ function updateCameraStatus(data) {
 		}
 	} catch (error) {
 		console.error('Error updating camera status:', error);
-		document.getElementById('camera-status').innerHTML = '<p style="color: red;">Failed to fetch camera status</p>';
 		document.getElementById('camera-select').innerHTML = '<option value="">Error loading cameras</option>';
 	}
 }
@@ -119,12 +117,16 @@ async function getSignStatus() {
 
 function updateSignButton(isActive) {
 	const button = document.getElementById('sign-button');
+	const sidebar = document.getElementById('transcript-sidebar');
+	
 	if (isActive) {
 		button.textContent = 'Stop Signing';
 		button.classList.add('active');
+		if (sidebar) sidebar.style.display = 'flex';
 	} else {
 		button.textContent = 'Start Signing';
 		button.classList.remove('active');
+		if (sidebar) sidebar.style.display = 'none';
 	}
 }
 
@@ -138,6 +140,13 @@ async function toggleSign() {
 	} catch (error) {
 		console.error('Error toggling sign status:', error);
 		alert('Failed to toggle signing');
+	}
+}
+
+function clearTranscript() {
+	const messageBox = document.getElementById('message-box');
+	if (messageBox) {
+		messageBox.value = '';
 	}
 }
 

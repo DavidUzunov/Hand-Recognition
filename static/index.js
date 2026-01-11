@@ -67,4 +67,14 @@ socket.on('camera_status', (data) => {
 	}
 });
 
-// ...other index-specific logic from app.js can be added here...
+// Toggle transcript sidebar
+document.addEventListener('DOMContentLoaded', () => {
+	const toggleBtn = document.getElementById('toggle-transcript');
+	const sidebar = document.getElementById('transcript-sidebar');
+	if (toggleBtn && sidebar) {
+		toggleBtn.addEventListener('click', () => {
+			sidebar.style.display = 'block';
+			toggleBtn.textContent = '<<';
+		});
+	}
+});

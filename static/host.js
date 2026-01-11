@@ -142,7 +142,7 @@ window.startHostCamera = async function (deviceId) {
 		async function sendFrame() {
 			if (!running) return;
 			const now = performance.now();
-			if (now - lastFrameTime < 33) {
+			if (now - lastFrameTime < 67) {
 				requestAnimationFrame(sendFrame);
 				return;
 			}

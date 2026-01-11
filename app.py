@@ -6,6 +6,7 @@ import threading
 import time
 import glob
 import tensorflow as tf
+from multiprocessing import Process, Queue
 
 mp_drawing = mp.solutions.drawing_utils
 mp_drawing_styles = mp.solutions.drawing_styles
@@ -14,22 +15,24 @@ model = tf.keras.models.load_model("model/asl_model.h5")
 
 # Global MediaPipe Hands instance (lazy loaded on first use)
 _hands_detector = None
-
+_hands_detector_lock = threading.Lock()
 
 def get_hands_detector():
-    """Get or create the global Hands detector instance"""
+    """Get or create the global Hands detector instance (thread-safe)"""
     global _hands_detector
-    if _hands_detector is None:
-        print("Initializing MediaPipe Hands detector...")
-        _hands_detector = mp_hands.Hands(
-            static_image_mode=False, max_num_hands=2, min_detection_confidence=0.5
-        )
-        print("MediaPipe Hands detector ready")
-    return _hands_detector
+    with _hands_detector_lock:
+        if _hands_detector is None:
+            print("Initializing MediaPipe Hands detector...")
+            _hands_detector = mp_hands.Hands(
+                static_image_mode=True, max_num_hands=2, min_detection_confidence=0.5
+            )
+            print("MediaPipe Hands detector ready")
+        return _hands_detector
 
 
 # Memory buffer to store frames (max 30 frames)
 frame_buffer = deque(maxlen=30)  # JPG bytes
+frame_byte_q = Queue()
 
 
 # Only keep sign_active for state
@@ -174,7 +177,11 @@ def capture_hands(curr_image):
     global send
     with get_hands_detector() as hands:
         # Read an image, flip it around y-axis for correct handedness output
-        image = cv2.flip(cv2.imread(curr_image), 1)
+        nparr = np.frombuffer(curr_image, np.uint8)
+        image = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+        if image is None:
+            return
+        image = cv2.flip(image, 1)
         # Convert the BGR image to RGB before processing.
         results = hands.process(cv2.cvtColor(image, cv2.COLOR_BGR2RGB))
         if not results.multi_hand_landmarks:

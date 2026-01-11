@@ -23,6 +23,7 @@ from app import (
     create_default_image,
     set_asl_transcript_callback,
     capture_hands,
+    frame_byte_q
 )
 
 # --- App Setup ---
@@ -86,8 +87,16 @@ def handle_host_frame(frame_bytes):
         handle_host_frame._last_time = now
         handle_host_frame._frame_count = 0
     socketio.emit("last_frame", {"timestamp": now})
+
+    # --- Rate limit hand capture to 15 fps ---
+    if not hasattr(handle_host_frame, "_last_hand_time"):
+        handle_host_frame._last_hand_time = 0
+    min_interval = 1.0 / 15.0
     if sign_active:
-        capture_hands(frame_bytes)
+        if now - handle_host_frame._last_hand_time >= min_interval:
+            capture_hands(frame_bytes)
+            handle_host_frame._last_hand_time = now
+    # ---
     pass
 
 

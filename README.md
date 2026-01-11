@@ -24,3 +24,11 @@ python app.py
 
 If you prefer a different venv path or Python executable, set `VENV_DIR` or `PYTHON` env vars when running the setup script.
 
+If you run `python bootstrap.py` and see "ModuleNotFoundError" for `cv2`, `mediapipe`, `numpy`, or `flask`, make sure you created the `.venv` and re-run using the venv Python. The bootstrap script will automatically re-launch itself with `.venv/bin/python` if that file exists. To manually ensure correct environment:
+
+```
+./scripts/setup_venv.sh
+source .venv/bin/activate
+python bootstrap.py
+```
+

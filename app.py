@@ -21,6 +21,21 @@ import threading
 import time
 import glob
 import glob
+import os
+import json
+
+# Try to import the ML model
+try:
+	from model import ASLRecognitionModel
+	ml_model = None  # Will be loaded lazily on demand
+	ml_model_lock = threading.Lock()
+	ml_loaded = False
+except ImportError:
+	print("Warning: ML model module not available. ASL prediction will be disabled.")
+	ASLRecognitionModel = None
+	ml_model = None
+	ml_model_lock = threading.Lock()
+	ml_loaded = False
 
 # (mp_drawing, mp_drawing_styles, mp_hands) already set above
 
@@ -393,6 +408,71 @@ def get_sequence_for_model(seq_len: int = 30):
 	return np.stack(frames, axis=0)
 
 
+def load_ml_model(model_path: str = "models/asl_model.h5"):
+	"""
+	Load the trained ASL recognition model.
+	
+	Args:
+		model_path: Path to the model file
+		
+	Returns:
+		ASLRecognitionModel instance or None if loading fails
+	"""
+	global ml_model, ml_loaded
+	
+	if ml_loaded:
+		return ml_model
+	
+	if ASLRecognitionModel is None:
+		print("ML model module not available")
+		return None
+	
+	with ml_model_lock:
+		try:
+			if not os.path.exists(model_path):
+				print(f"Model not found at {model_path}. ASL prediction disabled.")
+				ml_loaded = True
+				return None
+			
+			print(f"Loading ML model from {model_path}...")
+			ml_model = ASLRecognitionModel(model_path=model_path)
+			ml_model.load_model()
+			ml_loaded = True
+			print("ML model loaded successfully")
+			return ml_model
+		except Exception as e:
+			print(f"Error loading ML model: {e}")
+			ml_loaded = True
+			return None
+
+
+def predict_gesture(sequence: np.ndarray, confidence_threshold: float = 0.3):
+	"""
+	Predict ASL gesture from a video sequence.
+	
+	Args:
+		sequence: Numpy array shaped (seq_len, 224, 224, 3) or (1, seq_len, 224, 224, 3)
+		confidence_threshold: Minimum confidence for valid prediction
+		
+	Returns:
+		Dictionary with prediction results or None if model not available
+	"""
+	global ml_model
+	
+	# Load model if not already loaded
+	if ml_model is None and not ml_loaded:
+		ml_model = load_ml_model()
+	
+	if ml_model is None:
+		return None
+	
+	try:
+		return ml_model.predict(sequence, confidence_threshold=confidence_threshold)
+	except Exception as e:
+		print(f"Error in gesture prediction: {e}")
+		return None
+
+
 def set_asl_transcript_callback(callback):
 	"""Set a callback that receives a sequence numpy array when inference runs.
 
@@ -403,8 +483,8 @@ def set_asl_transcript_callback(callback):
 
 
 def sign_inference_loop(poll_interval: float = 0.5, seq_len: int = 30):
-	"""Background loop that collects sequences while `sign_active` is True and
-	invokes the `asl_transcript_callback` with the sequence for downstream ML.
+	"""Background loop that collects sequences while `sign_active` is True,
+	runs inference using the ML model, and invokes the callback with results.
 	"""
 	global inference_stop
 	while not inference_stop:
@@ -415,10 +495,18 @@ def sign_inference_loop(poll_interval: float = 0.5, seq_len: int = 30):
 		seq = get_sequence_for_model(seq_len)
 		if seq is not None:
 			try:
-				if asl_transcript_callback is not None:
-					asl_transcript_callback(seq)
+				# Try to use ML model for prediction
+				prediction = predict_gesture(seq, confidence_threshold=0.3)
+				
+				if prediction is not None and asl_transcript_callback is not None:
+					# Send prediction result to callback
+					# The callback can decide whether to display it or not
+					asl_transcript_callback(prediction)
+				elif seq is not None and asl_transcript_callback is not None:
+					# If no prediction available, send raw sequence for custom handling
+					asl_transcript_callback({"sequence": seq, "prediction": None})
 			except Exception as e:
-				print(f"Error in ASL callback: {e}")
+				print(f"Error in ASL inference: {e}")
 
 		time.sleep(poll_interval)
 

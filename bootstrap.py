@@ -6,6 +6,21 @@ This is the main entry point for starting the web server and camera capture.
 
 import signal
 import sys
+import os
+
+# If a `.venv` exists in the workspace, automatically re-exec this script with
+# that interpreter so users who run `python bootstrap.py` from system Python
+# get the correct environment and avoid "module not found" errors.
+VENV_PY = os.path.join(os.path.dirname(__file__), ".venv", "bin", "python")
+if os.path.exists(VENV_PY):
+	try:
+		# Compare resolved paths to avoid unnecessary re-exec
+		if os.path.realpath(sys.executable) != os.path.realpath(VENV_PY):
+			os.execv(VENV_PY, [VENV_PY] + sys.argv)
+	except Exception:
+		# Fall back to continuing with the current interpreter
+		pass
+
 import app as app_module
 from app import start_camera_capture
 from web import app, socketio

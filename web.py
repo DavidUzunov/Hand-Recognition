@@ -12,6 +12,7 @@ import glob
 import cv2
 import threading
 import time
+import app as app_module
 from app import (
     generate_frames,
     frame_buffer,
@@ -44,11 +45,58 @@ def ping():
     return jsonify({"message": "Pong!", "status": "success"})
 
 
-def send_asl_transcript(message):
-    """Send an ASL transcript message to all connected clients via WebSocket"""
-    if connected_clients > 0:
+def send_asl_transcript(result):
+    """
+    Send an ASL gesture prediction or transcript to all connected clients via WebSocket.
+    
+    Handles both:
+    - ML model predictions: dict with 'class_name', 'confidence', 'all_probs'
+    - Raw sequences: dict with 'sequence' and optional 'prediction'
+    """
+    if connected_clients <= 0:
+        return
+    
+    try:
         with app.app_context():
-            socketio.emit("asl_transcript", {"message": message}, to=None)
+            # Handle prediction dictionary (from ML model)
+            if isinstance(result, dict) and 'class_name' in result:
+                prediction = result
+                message = {
+                    "type": "gesture_prediction",
+                    "class_name": prediction.get('class_name'),
+                    "class_id": prediction.get('class_id'),
+                    "confidence": prediction.get('confidence'),
+                    "all_probs": prediction.get('all_probs', {}),
+                }
+            # Handle prediction with sequence wrapper
+            elif isinstance(result, dict) and 'prediction' in result:
+                prediction = result['prediction']
+                if prediction:
+                    message = {
+                        "type": "gesture_prediction",
+                        "class_name": prediction.get('class_name'),
+                        "class_id": prediction.get('class_id'),
+                        "confidence": prediction.get('confidence'),
+                        "all_probs": prediction.get('all_probs', {}),
+                    }
+                else:
+                    message = {
+                        "type": "gesture_capture",
+                        "status": "sequence_captured",
+                        "frames": result.get('sequence', {}).shape[0] if hasattr(result.get('sequence'), 'shape') else 0,
+                    }
+            # Handle string messages (legacy support)
+            elif isinstance(result, str):
+                message = {
+                    "type": "text_message",
+                    "message": result,
+                }
+            else:
+                return
+            
+            socketio.emit("asl_transcript", message, to=None)
+    except Exception as e:
+        print(f"Error in send_asl_transcript: {e}")
 
 
 # Set the callback to avoid circular import
@@ -173,7 +221,7 @@ def handle_toggle_sign(data):
     """Handle sign toggle request via WebSocket"""
     if data is None:
         data = {}
-    new_state = data.get("active", not sign_active)
+    new_state = data.get("active", not app_module.sign_active)
     app_module.set_sign_active(new_state)
     with app.app_context():
         emit(
@@ -308,7 +356,7 @@ def get_camera_status():
 
 
 @socketio.on("connect")
-def handle_connect():
+def handle_connect(auth=None):
     """Handle client connection"""
     global connected_clients, ping_thread, stop_ping_thread
     connected_clients += 1

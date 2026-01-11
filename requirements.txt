@@ -3,4 +3,6 @@ Flask-SocketIO
 opencv-python
 mediapipe
 tensorflow
-numpy
+numpyscikit-learn
+tqdm
+matplotlib

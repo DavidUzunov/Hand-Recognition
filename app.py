@@ -16,7 +16,7 @@ mp_hands = mp.solutions.hands
 # Memory buffer to store frames (max 30 frames)
 frame_buffer = deque(maxlen=30)  # JPG bytes
 global frame_byte_q
-frame_byte_q = Queue(maxsize=2)
+frame_byte_q = Queue(maxsize=1)
 
 
 # Only keep sign_active for state
@@ -178,6 +178,7 @@ def capture_hands(frame_byte_q):
         static_image_mode=False, max_num_hands=1, min_detection_confidence=0.5
     )
     print("Starting capture hands thread")
+    last_letter = ""
     while True:
         curr_image = frame_byte_q.get(block=True)
         frame_counter += 1
@@ -197,27 +198,28 @@ def capture_hands(frame_byte_q):
             print(
 				f"[capture_hands] Dropped frame {frame_counter}: no hand landmarks detected"
 			)
+            curr_letter = ""
             continue
         primary_hand = results.multi_hand_landmarks[0]
         data = process_hand_data(primary_hand)
         curr_letter = get_letter(data, model)
-        transcribe(curr_letter, double_letter, True)
-        """send = False
+        # send = False
         if curr_letter != last_letter:
-            if total_x >= 0.15:
+            """if total_x >= 0.15:
                 double_letter = True
             if curr_letter.isspace() == True:
                 send = True
-            transcribe(last_letter, double_letter, True)
+            """
+            transcribe(curr_letter, double_letter, True)
             last_x = 0
             total_x = 0
             double_letter = False
-            last_letter = curr_letter
         # checks for double letters via wrist data
-        if curr_letter == last_letter:
+        """if curr_letter == last_letter:
             curr_x = primary_hand.landmark[0].x
             total_x = total_x + (curr_x - last_x)
             last_x = curr_x
             curr_x = 0
-            """
+		"""
+        last_letter = curr_letter
         print(f"Processeed frame {frame_counter}!")

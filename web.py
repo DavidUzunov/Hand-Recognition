@@ -1,16 +1,3 @@
-# --- Host Endpoint ---
-@app.route("/host")
-def host():
-    return render_template("host.html")
-
-# --- Socket handler for host video frames ---
-@socketio.on("host_frame")
-def handle_host_frame(frame_bytes):
-    # Here you would process or forward the frame_bytes as needed
-    # For now, just print the size for debug
-    print(f"Received host frame: {len(frame_bytes)} bytes")
-    # You could broadcast to other clients, save, etc.
-    pass
 # --- Imports ---
 import os
 import glob
@@ -50,7 +37,7 @@ ping_thread = None
 stop_ping_thread = False
 
 
-# --- Auth Helpers ---
+# --- Utility & Auth Helpers ---
 def check_auth(username, password):
     return username == "admin" and password == "admin"
 
@@ -75,7 +62,6 @@ def requires_auth(f):
     return decorated
 
 
-# --- Utility Functions ---
 def send_asl_transcript(message):
     if connected_clients > 0:
         with app.app_context():
@@ -115,7 +101,70 @@ def get_camera_status():
 set_asl_transcript_callback(send_asl_transcript)
 
 
-# --- Admin Route ---
+# --- Socket Handlers ---
+@socketio.on("host_frame")
+def handle_host_frame(frame_bytes):
+    print(f"Received host frame: {len(frame_bytes)} bytes")
+    pass
+
+
+@socketio.on("get_sign_status")
+def handle_get_sign_status():
+    with app.app_context():
+        emit(
+            "sign_status",
+            {"signing_active": sign_active},
+        )
+
+
+@socketio.on("toggle_sign")
+def handle_toggle_sign(data=None):
+    if data is None:
+        data = {}
+    new_state = data.get("active", not sign_active)
+    set_sign_active(new_state)
+    with app.app_context():
+        emit(
+            "sign_status",
+            {"signing_active": sign_active},
+            to=None,
+        )
+
+
+@socketio.on("client_ping")
+def handle_client_ping(data):
+    t0 = data.get("t0") if data else None
+    emit("client_pong", {"t0": t0, "server_ts": time.time()})
+
+
+@socketio.on("connect")
+def handle_connect():
+    global connected_clients, ping_thread, stop_ping_thread
+    connected_clients += 1
+    print(f"Client connected. Total clients: {connected_clients}")
+    if ping_thread is None or not ping_thread.is_alive():
+        stop_ping_thread = False
+        ping_thread = threading.Thread(target=send_ping_messages, daemon=True)
+        ping_thread.start()
+    emit("connected", {"message": "Connected to server"})
+    camera_status = get_camera_status()
+    emit("camera_status", camera_status)
+
+
+@socketio.on("disconnect")
+def handle_disconnect():
+    global connected_clients
+    connected_clients -= 1
+    print(f"Client disconnected. Total clients: {connected_clients}")
+
+
+# --- Host Endpoint ---
+@app.route("/host")
+def host():
+    return render_template("host.html")
+
+
+# --- Admin Endpoint ---
 @app.route("/admin", methods=["GET", "POST"])
 @requires_auth
 def admin():
@@ -288,57 +337,6 @@ def upload_frame():
     frame_buffer.append(frame_data)
     print(f"Got image - Buffer size: {len(frame_buffer)}")
     return jsonify({"status": "success", "buffer_size": len(frame_buffer)})
-
-
-# --- WebSocket Events ---
-@socketio.on("get_sign_status")
-def handle_get_sign_status():
-    with app.app_context():
-        emit(
-            "sign_status",
-            {"signing_active": sign_active},
-        )
-
-
-@socketio.on("toggle_sign")
-def handle_toggle_sign(data=None):
-    if data is None:
-        data = {}
-    new_state = data.get("active", not sign_active)
-    set_sign_active(new_state)
-    with app.app_context():
-        emit(
-            "sign_status",
-            {"signing_active": sign_active},
-            to=None,
-        )
-
-
-@socketio.on("client_ping")
-def handle_client_ping(data):
-    t0 = data.get("t0") if data else None
-    emit("client_pong", {"t0": t0, "server_ts": time.time()})
-
-
-@socketio.on("connect")
-def handle_connect():
-    global connected_clients, ping_thread, stop_ping_thread
-    connected_clients += 1
-    print(f"Client connected. Total clients: {connected_clients}")
-    if ping_thread is None or not ping_thread.is_alive():
-        stop_ping_thread = False
-        ping_thread = threading.Thread(target=send_ping_messages, daemon=True)
-        ping_thread.start()
-    emit("connected", {"message": "Connected to server"})
-    camera_status = get_camera_status()
-    emit("camera_status", camera_status)
-
-
-@socketio.on("disconnect")
-def handle_disconnect():
-    global connected_clients
-    connected_clients -= 1
-    print(f"Client disconnected. Total clients: {connected_clients}")
 
 
 # --- Error Handlers ---

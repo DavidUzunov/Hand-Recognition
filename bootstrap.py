@@ -10,6 +10,9 @@ import app as app_module
 from app import start_camera_capture
 from web import app, socketio
 import web as web_module
+import os
+from flask import request, redirect
+import ssl
 
 
 def shutdown_handler(signum, frame):
@@ -33,6 +36,22 @@ def shutdown_handler(signum, frame):
     print("Shutdown complete. Goodbye!")
     print("=" * 60)
     sys.exit(0)
+
+
+# --- SSL/Redirect logic ---
+@app.before_request
+def force_ssl_or_http():
+    # Only allow HTTPS for /host, force HTTP for all others
+    if request.endpoint == 'host':
+        if request.scheme != 'https':
+            # Redirect to HTTPS
+            url = request.url.replace('http://', 'https://', 1)
+            return redirect(url, code=301)
+    else:
+        if request.scheme == 'https':
+            # Redirect to HTTP
+            url = request.url.replace('https://', 'http://', 1)
+            return redirect(url, code=301)
 
 
 def main():
@@ -60,6 +79,12 @@ def main():
     print("=" * 60)
 
     try:
+        ssl_context = None
+        # Only enable SSL if certs are present
+        cert_file = os.environ.get('SSL_CERT', 'cert.pem')
+        key_file = os.environ.get('SSL_KEY', 'key.pem')
+        if os.path.exists(cert_file) and os.path.exists(key_file):
+            ssl_context = (cert_file, key_file)
         socketio.run(
             app,
             debug=True,
@@ -67,6 +92,7 @@ def main():
             port=5000,
             allow_unsafe_werkzeug=True,
             use_reloader=True,
+            ssl_context=ssl_context,
         )
     except KeyboardInterrupt:
         shutdown_handler(None, None)

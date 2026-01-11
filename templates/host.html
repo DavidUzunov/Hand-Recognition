@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+	<meta charset="UTF-8">
+	<title>Signly Host</title>
+	<link rel="stylesheet" href="/static/common.css">
+	<link rel="stylesheet" href="/static/host.css">
+	<style>
+		.host-container {
+			width: auto;
+			max-width: none;
+			display: inline-block;
+			margin: 60px auto;
+			background: #fff;
+			padding: 30px;
+			border-radius: 10px;
+			box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+		}
+
+		.host-title {
+			font-size: 2em;
+			margin-bottom: 20px;
+			color: #667eea;
+			text-align: center;
+		}
+
+		#host-video {
+			width: 100%;
+			max-width: 480px;
+			border-radius: 8px;
+			background: #000;
+			margin: 0 auto 20px auto;
+			display: block;
+		}
+
+		#host-status {
+			margin-top: 10px;
+			color: #667eea;
+			font-weight: bold;
+			text-align: center;
+		}
+
+		.host-info {
+			display: flex;
+			gap: 30px;
+			justify-content: center;
+			margin-top: 10px;
+			margin-bottom: 10px;
+		}
+
+		.host-info-item {
+			font-size: 1em;
+			color: #333;
+		}
+	</style>
+</head>
+
+<body>
+	<header class="status-header">
+		<div class="header-item">
+			<span class="header-label">Resolution:</span>
+			<span id="video-resolution" class="header-value">-</span>
+		</div>
+		<div class="header-item">
+			<span class="header-label">FPS:</span>
+			<span id="video-fps" class="header-value">-</span>
+		</div>
+	</header>
+	<div class="container">
+		<div class="host-title">Signly Host</div>
+		<div id="camera-select-section" style="margin-bottom: 20px; text-align: center;">
+			<select id="camera-select"
+				style="padding: 8px 15px; font-size: 1em; border: 2px solid #667eea; border-radius: 5px;"></select>
+			<button id="start-camera-btn" class="admin-btn" style="margin-left: 10px;">Start Camera</button>
+			<div style="margin-top: 16px;">
+				<video id="camera-preview" width="320" height="240" autoplay playsinline muted
+					style="border-radius: 8px; background: #000; display: none;"></video>
+			</div>
+		</div>
+		<video id="host-video" autoplay playsinline muted style="display:none;"></video>
+		<div id="host-status">Please select a camera to start.</div>
+	</div>
+	<footer class="status-footer">
+		<div class="footer-item">
+			<span class="footer-label">Socket:</span>
+			<span id="socket-status" class="footer-value">Disconnected</span>
+		</div>
+		<div class="footer-item">
+			<span class="footer-label">Frames Sent:</span>
+			<span id="frames-sent" class="footer-value">0</span>
+		</div>
+	</footer>
+	<script src="https://cdn.socket.io/4.8.3/socket.io.min.js"></script>
+	<script type="module" src="/static/common.js"></script>
+	<script type="module" src="/static/host.js"></script>
+</body>
+
+</html>

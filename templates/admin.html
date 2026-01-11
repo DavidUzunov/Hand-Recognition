@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+	<meta charset="UTF-8">
+	<title>Admin Panel</title>
+	<link rel="stylesheet" href="/static/common.css">
+	<link rel="stylesheet" href="/static/admin.css">
+</head>
+
+<body>
+	<header class="status-header" style="position: relative;">
+		<a href="/" class="header-nav header-nav-left">Stream</a>
+		<div class="header-item">
+			<span class="header-label">Camera:</span>
+			<span id="camera-status-header" class="header-value">Unknown</span>
+		</div>
+		<div class="header-item">
+			<span class="header-label">Selected:</span>
+			<span id="selected-camera" class="header-value">-</span>
+		</div>
+		<div class="header-item">
+			<span class="header-label">Transcription:</span>
+			<span id="signing-status" class="header-value">Inactive</span>
+		</div>
+		<a href="/host" class="header-nav header-nav-right">Host</a>
+	</header>
+	<div class="admin-container">
+		<div class="admin-title">Signly Admin</div>
+		<form method="POST" onsubmit="return false;">
+			<div class="admin-controls"
+				style="margin-bottom: 18px; display: flex; gap: 16px; align-items: center; justify-content: center;">
+			</div>
+		</form>
+		{% if status %}
+		<div class="admin-status">{{ status }}</div>
+		{% endif %}
+		{% if debug_data %}
+		<div class="admin-debug">
+			<pre>{{ debug_data | tojson(indent=2) }}</pre>
+		</div>
+		{% endif %}
+	</div>
+	<footer class="status-footer">
+		<div class="footer-item">
+			<span class="footer-label">Socket:</span>
+			<span id="socket-status" class="footer-value">Disconnected</span>
+		</div>
+		<div class="footer-item">
+			<span class="footer-label">Ping:</span>
+			<span id="ping-time" class="footer-value">-</span>
+		</div>
+		<div class="footer-item">
+			<span class="footer-label">FPS:</span>
+			<span id="fps-counter" class="footer-value">0</span>
+		</div>
+		<div class="footer-item">
+			<span class="footer-label">Last Frame:</span>
+			<span id="last-frame-time" class="footer-value">-</span>
+		</div>
+	</footer>
+	<script src="https://cdn.socket.io/4.8.3/socket.io.min.js"></script>
+	<script type="module" src="/static/common.js"></script>
+	<script type="module" src="/static/admin.js"></script>
+</body>
+
+</html>

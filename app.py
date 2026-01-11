@@ -20,42 +20,38 @@ import numpy as np
 import threading
 import time
 import glob
-import glob
-import os
-import json
+import tensorflow as tf
+from multiprocessing import Process, Queue
 
-# Try to import the ML model
-try:
-	from model import ASLRecognitionModel
-	ml_model = None  # Will be loaded lazily on demand
-	ml_model_lock = threading.Lock()
-	ml_loaded = False
-except ImportError:
-	print("Warning: ML model module not available. ASL prediction will be disabled.")
-	ASLRecognitionModel = None
-	ml_model = None
-	ml_model_lock = threading.Lock()
-	ml_loaded = False
+mp_drawing = mp.solutions.drawing_utils
+mp_drawing_styles = mp.solutions.drawing_styles
+mp_hands = mp.solutions.hands
+model = tf.keras.models.load_model("model/asl_model.h5")
 
-# (mp_drawing, mp_drawing_styles, mp_hands) already set above
+# Global MediaPipe Hands instance (lazy loaded on first use)
+_hands_detector = None
+_hands_detector_lock = threading.Lock()
+
+def get_hands_detector():
+	"""Get or create the global Hands detector instance (thread-safe)"""
+	global _hands_detector
+	with _hands_detector_lock:
+		if _hands_detector is None:
+			print("Initializing MediaPipe Hands detector...")
+			_hands_detector = mp_hands.Hands(
+				static_image_mode=True, max_num_hands=2, min_detection_confidence=0.5
+			)
+			print("MediaPipe Hands detector ready")
+		return _hands_detector
+
 
 # Memory buffer to store frames (max 30 frames)
 frame_buffer = deque(maxlen=30)  # JPG bytes
+frame_byte_q = Queue(maxsize=5)
 
-# Global variables for video capture
-cap = None
-current_frame = None  # JPG
-frame_lock = threading.Lock()
-camera_available = False
-camera_id = 0  # Default camera ID
-capture_thread = None
-stop_capture = False
-sign_active = False  # Track if hand signing capture is active
-# Latest model-ready frame (numpy array, RGB, float32 normalized to [0,1])
-model_frame = None
-asl_transcript_callback = None
-inference_thread = None
-inference_stop = False
+
+# Only keep sign_active for state
+sign_active = True  # Track if hand signing capture is active (default ON)
 
 # Global variables for hand-tracking/transcribing
 curr_word = ""
@@ -63,43 +59,47 @@ last_x = 0
 total_x = 0
 curr_x = 0
 double_letter = False
+curr_letter = ""
+last_letter = ""
+LETTERS = [
+	"A",
+	"B",
+	"C",
+	"D",
+	"E",
+	"F",
+	"G",
+	"H",
+	"I",
+	"J",
+	"K",
+	"L",
+	"M",
+	"N",
+	"O",
+	"P",
+	"Q",
+	"R",
+	"S",
+	"T",
+	"U",
+	"V",
+	"W",
+	"X",
+	"Y",
+	"Z",
+]
 
 
-def detect_available_cameras():
-	"""Detect available camera devices and return list of camera IDs"""
-	available_cameras = []
-	# Check /dev/video* devices on Linux
-	for video_device in sorted(glob.glob("/dev/video*")):
-		try:
-			device_num = int(video_device.split("video")[1])
-			cap = cv2.VideoCapture(device_num, cv2.CAP_V4L2)
-			if cap.isOpened():
-				available_cameras.append(device_num)
-				cap.release()
-		except (ValueError, IndexError):
-			pass
-	return available_cameras
+# Remove camera detection logic
 
-
-def set_default_camera():
-	"""Set camera_id to first available camera, or 0 if none available"""
-	global camera_id
-	available = detect_available_cameras()
-	if available:
-		camera_id = available[0]
-		print(f"Found {len(available)} camera(s). Using camera {camera_id} (/dev/video{camera_id})")
-		if len(available) > 1:
-			print(f"Other cameras available: {[f'/dev/video{c}' for c in available[1:]]}")
-	else:
-		camera_id = 0
-		print("No cameras detected. Using default camera_id=0")
 
 last_x = 0
 total_x = 0
 curr_x = 0
 double_letter = False
-curr_letter = "a" # placeholder value --> will store actual current letter
-last_letter = "b" # ditto
+curr_letter = "a"  # placeholder value --> will store actual current letter
+last_letter = "b"  # ditto
 
 # Callback function for sending ASL transcript (set by web.py to avoid circular import)
 asl_transcript_callback = None
@@ -119,8 +119,8 @@ def create_default_image():
 
 	# Add text to the image
 	font = cv2.FONT_HERSHEY_SIMPLEX
-	text1 = "No Camera Detected"
-	text2 = "Please connect a camera"
+	text1 = "No Stream Online"
+	text2 = "Host can login to start"
 
 	# Calculate text size and position for centering
 	text_size1 = cv2.getTextSize(text1, font, 2, 3)[0]
@@ -358,184 +358,14 @@ def set_camera_id(new_id):
 
 
 def set_sign_active(active):
-	"""Set whether hand sign detection is active"""
+	# Set whether hand sign detection is active
 	global sign_active
 	sign_active = active
-	# Start inference thread when enabling sign capture
-	if sign_active:
-		start_sign_inference()
 
-
-def get_model_input():
-	"""Return the latest model-ready frame (RGB float32 224x224) or None."""
-	global model_frame
-	with frame_lock:
-		if model_frame is None:
-			return None
-		return model_frame.copy()
-
-
-def get_recent_frames(count: int = 30):
-	"""Return up to `count` most recent frames from the buffer as model-ready arrays.
-
-	Returns a list of numpy arrays shaped (224,224,3) dtype float32 normalized [0,1].
-	"""
-	results = []
-	with frame_lock:
-		items = list(frame_buffer)[-count:]
-	for b in items:
-		try:
-			arr = np.frombuffer(b, dtype=np.uint8)
-			img = cv2.imdecode(arr, cv2.IMREAD_COLOR)
-			if img is None:
-				continue
-			rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-			small = cv2.resize(rgb, (224, 224), interpolation=cv2.INTER_LINEAR)
-			results.append(small.astype(np.float32) / 255.0)
-		except Exception:
-			continue
-	return results
-
-
-def get_sequence_for_model(seq_len: int = 30):
-	"""Return a numpy array shaped (N,224,224,3) with the latest up to seq_len frames.
-
-	If fewer than `seq_len` frames are available, returns the available frames.
-	"""
-	frames = get_recent_frames(seq_len)
-	if not frames:
-		return None
-	return np.stack(frames, axis=0)
-
-
-def load_ml_model(model_path: str = "models/asl_model.h5"):
-	"""
-	Load the trained ASL recognition model.
-	
-	Args:
-		model_path: Path to the model file
-		
-	Returns:
-		ASLRecognitionModel instance or None if loading fails
-	"""
-	global ml_model, ml_loaded
-	
-	if ml_loaded:
-		return ml_model
-	
-	if ASLRecognitionModel is None:
-		print("ML model module not available")
-		return None
-	
-	with ml_model_lock:
-		try:
-			if not os.path.exists(model_path):
-				print(f"Model not found at {model_path}. ASL prediction disabled.")
-				ml_loaded = True
-				return None
-			
-			print(f"Loading ML model from {model_path}...")
-			ml_model = ASLRecognitionModel(model_path=model_path)
-			ml_model.load_model()
-			ml_loaded = True
-			print("ML model loaded successfully")
-			return ml_model
-		except Exception as e:
-			print(f"Error loading ML model: {e}")
-			ml_loaded = True
-			return None
-
-
-def predict_gesture(sequence: np.ndarray, confidence_threshold: float = 0.3):
-	"""
-	Predict ASL gesture from a video sequence.
-	
-	Args:
-		sequence: Numpy array shaped (seq_len, 224, 224, 3) or (1, seq_len, 224, 224, 3)
-		confidence_threshold: Minimum confidence for valid prediction
-		
-	Returns:
-		Dictionary with prediction results or None if model not available
-	"""
-	global ml_model
-	
-	# Load model if not already loaded
-	if ml_model is None and not ml_loaded:
-		ml_model = load_ml_model()
-	
-	if ml_model is None:
-		return None
-	
-	try:
-		return ml_model.predict(sequence, confidence_threshold=confidence_threshold)
-	except Exception as e:
-		print(f"Error in gesture prediction: {e}")
-		return None
-
-
-def set_asl_transcript_callback(callback):
-	"""Set a callback that receives a sequence numpy array when inference runs.
-
-	Callback signature: fn(sequence: np.ndarray) -> None
-	"""
-	global asl_transcript_callback
-	asl_transcript_callback = callback
-
-
-def sign_inference_loop(poll_interval: float = 0.5, seq_len: int = 30):
-	"""Background loop that collects sequences while `sign_active` is True,
-	runs inference using the ML model, and invokes the callback with results.
-	"""
-	global inference_stop
-	while not inference_stop:
-		if not sign_active:
-			time.sleep(poll_interval)
-			continue
-
-		seq = get_sequence_for_model(seq_len)
-		if seq is not None:
-			try:
-				# Try to use ML model for prediction
-				prediction = predict_gesture(seq, confidence_threshold=0.3)
-				
-				if prediction is not None and asl_transcript_callback is not None:
-					# Send prediction result to callback
-					# The callback can decide whether to display it or not
-					asl_transcript_callback(prediction)
-				elif seq is not None and asl_transcript_callback is not None:
-					# If no prediction available, send raw sequence for custom handling
-					asl_transcript_callback({"sequence": seq, "prediction": None})
-			except Exception as e:
-				print(f"Error in ASL inference: {e}")
-
-		time.sleep(poll_interval)
-
-
-def start_sign_inference():
-	"""Start the inference background thread if not already running."""
-	global inference_thread, inference_stop
-	if inference_thread and inference_thread.is_alive():
-		return
-	inference_stop = False
-	inference_thread = threading.Thread(target=sign_inference_loop, daemon=True)
-	inference_thread.start()
-
-
-def stop_sign_inference():
-	global inference_stop, inference_thread
-	inference_stop = True
-	if inference_thread:
-		inference_thread.join(timeout=1.0)
-
-
-def double_letter_tracking(hand_landmarks, last_x, total_x):
-	# this will track double letters
-	# anywhere over 0.15 of screen = double?
-	curr_x = hand_landmarks.landmark[mp_hands.HandLandmark.WRIST].x
-	total_x = total_x + (curr_x - last_x)
 
 def transcribe(letter, double_letter, send):
 	# this will transcribe letters
+	global curr_word
 	if letter == " ":
 		return
 	else:
@@ -546,43 +376,63 @@ def transcribe(letter, double_letter, send):
 			if asl_transcript_callback is not None:
 				asl_transcript_callback(curr_word)
 
-def capture_hands(curr_image):
-	# this will be thing that stores all images, placeholder for now
-	double_letter = False
-	with mp_hands.Hands(
-		static_image_mode=True, max_num_hands=2, min_detection_confidence=0.5
-	) as hands:
-		# Read an image, flip it around y-axis for correct handedness output (see
-		# above).
-		image = cv2.flip(cv2.imread(curr_image), 1)
-		# Convert the BGR image to RGB before processing.
-		results = hands.process(cv2.cvtColor(image, cv2.COLOR_BGR2RGB))
-		if not results.multi_hand_landmarks:
-			return
-		hand = results.multi_hand_landmarks[0]
-		# Print handedness
-		print("Handedness:", results.multi_handedness)
-		image_height, image_width, _ = image.shape
-		for hand_landmarks in results.multi_hand_landmarks:
-			print("hand_landmarks:", hand_landmarks)
-			print(
-				f"Index finger tip coordinates: (",
-				f"{hand_landmarks.landmark[mp_hands.HandLandmark.INDEX_FINGER_TIP].x * image_width}, "
-				f"{hand_landmarks.landmark[mp_hands.HandLandmark.INDEX_FINGER_TIP].y * image_height})",
-			)
-		send = False
-		if curr_letter != last_letter:
-			if total_x >= 0.15 * image_width:
-				double_letter = True
-			last_x = 0
-			total_x = 0
-			if curr_letter == " ":
-				send = True
-			transcribe(last_letter, double_letter, send)
-			double_letter = False
-			last_letter = curr_letter
-		# checks for double letters
-		curr_x = results.multi_hand_landmarks[mp_hands.HandLandmark.WRIST].x * image_width
-		if curr_letter == last_letter:
-			double_letter_tracking(hand_landmarks, last_x, curr_x)
-		curr_x = 0
+
+def process_hand_data(hand):
+	data_list = []
+	# normalizes the data via the wrist for better model processing (wrist is (0,0,0))
+	for measurement in hand.landmark:
+		data_list.append(measurement.x - hand.landmark[0].x)
+		data_list.append(measurement.y - hand.landmark[0].y)
+		data_list.append(measurement.z - hand.landmark[0].z)
+	return np.array(data_list).reshape(1, -1)
+
+
+def get_letter(data):
+	global curr_letter
+	prediction = model.predict(data, verbose=0)
+	id = np.argmax(prediction)
+	curr_letter = LETTERS[id]
+
+
+def capture_hands(frame_byte_q):
+	global last_letter
+	global curr_letter
+	global last_x
+	global total_x
+	global double_letter
+	global send
+	while True:
+		curr_image = frame_byte_q.get(block=True)
+		with get_hands_detector() as hands:
+			# Read an image, flip it around y-axis for correct handedness output
+			nparr = np.frombuffer(curr_image, np.uint8)
+			image = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+			if image is None:
+				return
+			image = cv2.flip(image, 1)
+			# Convert the BGR image to RGB before processing.
+			results = hands.process(cv2.cvtColor(image, cv2.COLOR_BGR2RGB))
+			if not results.multi_hand_landmarks:
+				return
+			primary_hand = results.multi_hand_landmarks[0]
+			data = process_hand_data(primary_hand)
+			get_letter(data)
+			send = False
+			if curr_letter != last_letter:
+				if total_x >= 0.15:
+					double_letter = True
+				if curr_letter.isspace() == True:
+					send = True
+				if last_letter.isspace() == False:
+					curr_letter = curr_letter.lower()
+				transcribe(curr_letter, double_letter, send)
+				last_x = 0
+				total_x = 0
+				double_letter = False
+				last_letter = curr_letter
+			# checks for double letters via wrist data
+			if curr_letter == last_letter:
+				curr_x = primary_hand.landmark[0].x
+				total_x = total_x + (curr_x - last_x)
+				last_x = curr_x
+			curr_x = 0

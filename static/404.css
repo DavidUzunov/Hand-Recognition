@@ -1,0 +1,52 @@
+/* 404-specific CSS */
+
+.error-code {
+	font-size: 5em;
+	color: #667eea;
+	font-weight: bold;
+	margin: 0;
+	line-height: 1;
+}
+
+.error-title {
+	font-size: 2em;
+	color: #764ba2;
+	margin: 20px 0;
+	font-weight: bold;
+}
+
+.error-message {
+	font-size: 1.5em;
+	color: #333;
+	margin: 30px 0;
+	font-style: italic;
+}
+
+.droid-icon {
+	font-size: 4em;
+	margin: 20px 0;
+}
+
+.subtitle {
+	color: #999;
+	font-size: 1.1em;
+	margin-top: 20px;
+}
+
+.container {
+	background: #fff;
+	padding: 32px;
+	border-radius: 10px;
+	box-shadow: 0 10px 25px rgba(0, 0, 0, 0.18);
+	max-width: 700px;
+	margin: 90px auto 40px auto;
+	position: relative;
+}
+
+.container .error-code,
+.container .error-title,
+.container .error-message,
+.container .droid-icon,
+.container .subtitle {
+	text-align: center;
+}

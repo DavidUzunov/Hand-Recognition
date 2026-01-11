@@ -5,7 +5,6 @@
 	<meta charset="UTF-8">
 	<meta name="viewport" content="width=device-width, initial-scale=1.0">
 	<title>Signly</title>
-	<link rel="dns-prefetch" href="https://cdn.socket.io">
 	<link rel="preconnect" href="https://cdn.socket.io" crossorigin>
 	<link rel="prefetch" href="/no_camera">
 	<link rel="stylesheet" href="/static/style.css">
@@ -36,13 +35,39 @@
 				<div class="text-output">
 					<div class="transcript-header">
 						<label for="message-box">ASL Transcript:</label>
-						<button id="clear-transcript-button" onclick="clearTranscript()">Clear</button>
+						<div class="header-buttons">
+							<button id="share-transcript-button" onclick="shareTranscript()">Share</button>
+							<button id="clear-transcript-button" onclick="clearTranscript()">Clear</button>
+						</div>
 					</div>
 					<textarea id="message-box" readonly rows="25" cols="40"></textarea>
 				</div>
 			</div>
 		</div>
 	</div>
+
+	<footer class="status-footer">
+		<div class="footer-item">
+			<span class="footer-label">Socket:</span>
+			<span id="socket-status" class="footer-value">Disconnected</span>
+		</div>
+		<div class="footer-item">
+			<span class="footer-label">Ping:</span>
+			<span id="ping-time" class="footer-value">-</span>
+		</div>
+		<div class="footer-item">
+			<span class="footer-label">FPS:</span>
+			<span id="fps-counter" class="footer-value">0</span>
+		</div>
+		<div class="footer-item">
+			<span class="footer-label">Last Frame:</span>
+			<span id="last-frame-time" class="footer-value">-</span>
+		</div>
+		<div class="footer-item">
+			<span class="footer-label">Camera:</span>
+			<span id="camera-status-footer" class="footer-value">Unknown</span>
+		</div>
+	</footer>
 
 	<script src="/static/app.js"></script>
 </body>

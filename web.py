@@ -267,13 +267,15 @@ def upload_frame():
 
 
 def send_ping_messages():
-    """Send ping messages every 15 seconds to all connected clients"""
+    """Send ping messages every 2 seconds to all connected clients"""
     global stop_ping_thread
     while not stop_ping_thread:
         if connected_clients > 0:
             with app.app_context():
-                socketio.emit("ping", {"message": "ping"}, to=None)
-        time.sleep(15)
+                socketio.emit(
+                    "ping", {"message": "ping", "timestamp": time.time()}, to=None
+                )
+        time.sleep(2)
 
 
 def send_asl_transcript(message):

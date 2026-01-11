@@ -1,4 +1,40 @@
 /* Shared Styles */
+.status-footer {
+	position: fixed;
+	bottom: 0;
+	left: 0;
+	right: 0;
+	background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+	color: white;
+	padding: 12px 20px;
+	display: flex;
+	justify-content: center;
+	gap: 30px;
+	flex-wrap: wrap;
+	font-size: 0.9em;
+	box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.2);
+}
+
+.footer-item {
+	display: flex;
+	gap: 8px;
+	align-items: center;
+}
+
+.footer-label {
+	font-weight: bold;
+	text-transform: uppercase;
+	font-size: 0.85em;
+	opacity: 0.9;
+}
+
+.footer-value {
+	font-family: monospace;
+	background-color: rgba(255, 255, 255, 0.2);
+	padding: 2px 8px;
+	border-radius: 3px;
+}
+
 body {
 	font-family: Arial, sans-serif;
 	display: flex;
@@ -8,6 +44,7 @@ body {
 	margin: 0;
 	background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
 	padding: 20px;
+	padding-bottom: 100px;
 }
 
 .container {
@@ -16,8 +53,13 @@ body {
 	padding: 30px;
 	border-radius: 10px;
 	box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
-	max-width: 1400px;
+	max-width: 900px;
 	width: 100%;
+	transition: max-width 0.3s ease;
+}
+
+.container.expanded {
+	max-width: 1400px;
 }
 
 .content-wrapper {
@@ -50,6 +92,11 @@ body {
 	justify-content: space-between;
 	align-items: center;
 	margin-bottom: 10px;
+}
+
+.header-buttons {
+	display: flex;
+	gap: 8px;
 }
 
 .text-output label {

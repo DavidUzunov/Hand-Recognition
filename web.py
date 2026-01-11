@@ -105,7 +105,7 @@ def handle_host_frame(frame_bytes):
 	# --- Rate limit hand capture to 15 fps ---
 	if not hasattr(handle_host_frame, "_last_hand_time"):
 		handle_host_frame._last_hand_time = 0
-	min_interval = 1.0 / 15.0
+	min_interval = 1.0 / 5.0
 	if sign_active:
 		if now - handle_host_frame._last_hand_time >= min_interval:
 			if frame_byte_q.full() == False:

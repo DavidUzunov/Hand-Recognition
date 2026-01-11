@@ -16,7 +16,7 @@ mp_hands = mp.solutions.hands
 # Memory buffer to store frames (max 30 frames)
 frame_buffer = deque(maxlen=30)  # JPG bytes
 global frame_byte_q
-frame_byte_q = Queue(maxsize=5)
+frame_byte_q = Queue(maxsize=2)
 
 
 # Only keep sign_active for state

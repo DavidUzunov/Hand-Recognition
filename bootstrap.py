@@ -44,6 +44,7 @@ def shutdown_handler(signum, frame):
 
 def run_http():
 	"""Run HTTP server"""
+	socketio.start_background_task(target=web_module.socket_message_send_handler)
 	socketio.run(app, host="0.0.0.0", port=5000)
 
 
@@ -53,6 +54,7 @@ def run_https():
 	key_file = os.environ.get("SSL_KEY", "key.pem")
 	if os.path.exists(cert_file) and os.path.exists(key_file):
 		ssl_context = (cert_file, key_file)
+		socketio.start_background_task(target=web_module.socket_message_send_handler)
 		socketio.run(
 			app,
 			host="0.0.0.0",

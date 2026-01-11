@@ -87,6 +87,9 @@ socket.on('asl_transcript', (data) => {
 		// Update line count
 		const lines = messageBox.value.split('\n').filter(line => line.trim()).length;
 		document.getElementById('transcript-lines').textContent = lines;
+		console.info('Appended transcript to message box');
+	} else {
+		console.warn('Message box not found to append transcript');
 	}
 });
 

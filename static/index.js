@@ -67,14 +67,15 @@ socket.on('camera_status', (data) => {
 	}
 });
 
-// Toggle transcript sidebar
-document.addEventListener('DOMContentLoaded', () => {
-	const toggleBtn = document.getElementById('toggle-transcript');
-	const sidebar = document.getElementById('transcript-sidebar');
-	if (toggleBtn && sidebar) {
-		toggleBtn.addEventListener('click', () => {
-			sidebar.style.display = 'block';
-			toggleBtn.textContent = '<<';
-		});
+// Update transcript when receiving ASL transcript messages
+socket.on('asl_transcript', (data) => {
+	if (data && data.message) {
+		console.log('[asl_transcript] Received:', data.message);
+		const messageBox = document.getElementById('message-box');
+		if (messageBox) {
+			messageBox.value += data.message;
+		}
+	} else {
+		console.log('[asl_transcript] Received empty or malformed data:', data);
 	}
 });

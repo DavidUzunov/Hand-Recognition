@@ -124,7 +124,13 @@ def set_sign_active(active):
 def transcribe(letter, double_letter, send):
 	# this will transcribe letters
 	global curr_word
-	if letter == " ":
+	curr_word = curr_word + letter
+	if asl_transcript_callback is not None:
+		asl_transcript_callback(letter)
+		print(f"Sent ASL Transcript: {letter}")
+	else:
+		print("ASL Transcript Callback not set!")
+	"""if letter == " ":
 		return
 	else:
 		curr_word = curr_word + letter
@@ -133,6 +139,10 @@ def transcribe(letter, double_letter, send):
 		if send == True:
 			if asl_transcript_callback is not None:
 				asl_transcript_callback(curr_word)
+				print(f"Sent ASL Transcript: {curr_word}")
+			else:
+				print("ASL Transcript Callback not set!")
+    """
 
 
 def process_hand_data(hand):
@@ -151,8 +161,8 @@ def get_letter(data, model):
 	prediction = model.predict(data, verbose=1)
 	print("predicted")
 	id = np.argmax(prediction)
-	curr_letter = LETTERS[id]
-	print(f"letter prediicted: {curr_letter}")
+
+	return LETTERS[id]
 
 
 def capture_hands(frame_byte_q):
@@ -169,7 +179,6 @@ def capture_hands(frame_byte_q):
     )
     print("Starting capture hands thread")
     while True:
-        print("Ready to process on get")
         curr_image = frame_byte_q.get(block=True)
         frame_counter += 1
         print(f"[capture_hands] Processing frame {frame_counter}")
@@ -177,35 +186,29 @@ def capture_hands(frame_byte_q):
         nparr = np.frombuffer(curr_image, np.uint8)
         if nparr is None:
             print("NP Array failed")
-        print("Made an NP Array correctly")
         image = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
         if image is None:
             print(f"[capture_hands] Dropped frame {frame_counter}: image decode failed")
             continue
-        print("imdecode worked")
         image = cv2.flip(image, 1)
-        print("cv2 flip worked")
         # Convert the BGR image to RGB before processing.
         results = hands.process(cv2.cvtColor(image, cv2.COLOR_BGR2RGB))
-        print("got hands process to work")
         if not results.multi_hand_landmarks:
             print(
 				f"[capture_hands] Dropped frame {frame_counter}: no hand landmarks detected"
 			)
             continue
-        print("got past if")
         primary_hand = results.multi_hand_landmarks[0]
-        print("processing hand data")
         data = process_hand_data(primary_hand)
-        print("processed hand data")
-        get_letter(data, model)
-        send = False
+        curr_letter = get_letter(data, model)
+        transcribe(curr_letter, double_letter, True)
+        """send = False
         if curr_letter != last_letter:
             if total_x >= 0.15:
                 double_letter = True
             if curr_letter.isspace() == True:
                 send = True
-            transcribe(last_letter, double_letter, send)
+            transcribe(last_letter, double_letter, True)
             last_x = 0
             total_x = 0
             double_letter = False
@@ -216,4 +219,5 @@ def capture_hands(frame_byte_q):
             total_x = total_x + (curr_x - last_x)
             last_x = curr_x
             curr_x = 0
+            """
         print(f"Processeed frame {frame_counter}!")

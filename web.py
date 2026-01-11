@@ -161,18 +161,22 @@ def handle_disconnect():
 
 # --- Host Endpoint ---
 @app.route("/host")
-@requires_auth(role="host")
 def host():
+    key = request.args.get("key")
+    if key != "123":
+        return render_template("401.html"), 401
     # Only redirect if camera is actively streaming (frame_buffer has frames)
     if len(frame_buffer) > 0:
-        return redirect(url_for("admin"))
+        return redirect(url_for("admin", key=key))
     return render_template("host.html")
 
 
 # --- Admin Endpoint ---
 @app.route("/admin")
-@requires_auth()
 def admin():
+    key = request.args.get("key")
+    if key != "123":
+        return render_template("401.html"), 401
     status = None
     debug_data = None
     # Get debug info for admin page

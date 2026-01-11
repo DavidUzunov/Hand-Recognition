@@ -20,11 +20,9 @@ adminSocket.on('sign_status', function (data) {
 	}
 	setTranscriptionControlsDisabled(!!data.signing_active);
 });
-if (toggleBtn) {
-	toggleBtn.addEventListener('click', function () {
-		adminSocket.emit('toggle_sign');
-	});
-}
+toggleBtn.addEventListener('click', function () {
+	adminSocket.emit('toggle_sign');
+});
 adminSocket.emit('get_sign_status');
 
 // Listen for camera_status events and update status

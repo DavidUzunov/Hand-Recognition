@@ -31,6 +31,9 @@ connected_clients = 0
 ping_thread = None
 stop_ping_thread = False
 
+# Track if a host is logged in
+host_logged_in = False
+
 
 # --- Utility & Auth Helpers ---
 def check_auth(username, password):
@@ -143,14 +146,21 @@ def handle_connect():
 
 @socketio.on("disconnect")
 def handle_disconnect():
-    global connected_clients
+    global connected_clients, host_logged_in
     connected_clients -= 1
     print(f"Client disconnected. Total clients: {connected_clients}")
+    # If no clients are connected, clear host_logged_in
+    if connected_clients <= 0:
+        host_logged_in = False
 
 
 # --- Host Endpoint ---
 @app.route("/host")
 def host():
+    global host_logged_in
+    if host_logged_in:
+        return redirect(url_for('admin'))
+    host_logged_in = True
     return render_template("host.html")
 
 

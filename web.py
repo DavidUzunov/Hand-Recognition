@@ -35,6 +35,7 @@ stop_ping_thread = False
 # Track if a host is logged in
 host_logged_in = False
 
+
 def send_asl_transcript(message):
     if connected_clients > 0:
         with app.app_context():
@@ -68,15 +69,31 @@ set_asl_transcript_callback(send_asl_transcript)
 # --- Socket Handlers ---
 @socketio.on("host_frame")
 def handle_host_frame(frame_bytes):
+    global sign_active
     # Store host stream frames in the same buffer as before
     frame_buffer.append(frame_bytes)
-    if sign_active == True:
+    # Emit FPS and last frame time to all clients
+    now = time.time()
+    # Calculate FPS based on buffer timestamps (simple approach)
+    if not hasattr(handle_host_frame, "_last_time"):
+        handle_host_frame._last_time = now
+        handle_host_frame._frame_count = 0
+    handle_host_frame._frame_count += 1
+    elapsed = now - handle_host_frame._last_time
+    if elapsed >= 1.0:
+        fps = handle_host_frame._frame_count / elapsed
+        socketio.emit("fps_update", {"fps": fps})
+        handle_host_frame._last_time = now
+        handle_host_frame._frame_count = 0
+    socketio.emit("last_frame", {"timestamp": now})
+    if sign_active:
         capture_hands(frame_bytes)
     pass
 
 
 @socketio.on("get_sign_status")
 def handle_get_sign_status():
+    global sign_active
     with app.app_context():
         emit(
             "sign_status",
@@ -86,9 +103,12 @@ def handle_get_sign_status():
 
 @socketio.on("toggle_sign")
 def handle_toggle_sign(data=None):
+    global sign_active
+    print("[SOCKET] Received toggle_sign event")
     if data is None:
         data = {}
     new_state = data.get("active", not sign_active)
+    print(f"[SOCKET] Changing sign_active from {sign_active} to {new_state}")
     set_sign_active(new_state)
     with app.app_context():
         emit(
@@ -140,6 +160,7 @@ def host():
 # --- Admin Endpoint ---
 @app.route("/admin")
 def admin():
+    global sign_active
     status = None
     debug_data = None
     # Get debug info for admin page

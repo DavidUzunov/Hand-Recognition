@@ -33,7 +33,7 @@ frame_buffer = deque(maxlen=30)  # JPG bytes
 
 
 # Only keep sign_active for state
-sign_active = False  # Track if hand signing capture is active
+sign_active = True  # Track if hand signing capture is active (default ON)
 
 # Global variables for hand-tracking/transcribing
 curr_word = ""
@@ -127,8 +127,9 @@ def create_default_image():
 # Generate default image once at startup
 default_image = create_default_image()
 
+
 def set_sign_active(active):
-    """Set whether hand sign detection is active"""
+    # Set whether hand sign detection is active
     global sign_active
     sign_active = active
 

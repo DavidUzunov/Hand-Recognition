@@ -47,7 +47,14 @@ def run_https():
     key_file = os.environ.get("SSL_KEY", "key.pem")
     if os.path.exists(cert_file) and os.path.exists(key_file):
         ssl_context = (cert_file, key_file)
-        socketio.run(app, host="0.0.0.0", port=5000, ssl_context=ssl_context)
+        socketio.run(
+            app,
+            host="0.0.0.0",
+            port=5000,
+            ssl_context=ssl_context,
+            debug=False,
+            use_reloader=False,
+        )
 
 
 def main():

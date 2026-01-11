@@ -8,6 +8,8 @@ const cameraSelect = document.getElementById('camera_id');
 const transcribeMode = document.getElementById('transcribe-mode');
 const socketStatus = document.getElementById('socket-status');
 const pingTime = document.getElementById('ping-time');
+const fpsCounter = document.getElementById('fps-counter');
+const lastFrameTime = document.getElementById('last-frame-time');
 let lastPing = null;
 
 adminSocket.on('connect', function () {
@@ -33,12 +35,14 @@ function setTranscriptionControlsDisabled(disabled) {
 }
 
 adminSocket.on('sign_status', function (data) {
+	console.log('Received sign_status:', data);
 	if (toggleBtn) {
 		toggleBtn.textContent = data.signing_active ? 'Stop ASL Transcription' : 'Start ASL Transcription';
 	}
-	setTranscriptionControlsDisabled(!!data.signing_active);
+	setTranscriptionControlsDisabled(!data.signing_active);
 });
 toggleBtn.addEventListener('click', function () {
+	console.log('Toggle ASL Transcription button clicked');
 	adminSocket.emit('toggle_sign');
 });
 adminSocket.emit('get_sign_status');
@@ -46,6 +50,19 @@ adminSocket.emit('get_sign_status');
 // Listen for camera_status events and update status
 adminSocket.on('camera_status', (data) => {
 	if (window.updateCameraStatus) window.updateCameraStatus(data);
+});
+
+adminSocket.on('fps_update', function (data) {
+	if (fpsCounter && typeof data.fps === 'number') {
+		fpsCounter.textContent = data.fps.toFixed(1);
+	}
+});
+
+adminSocket.on('last_frame', function (data) {
+	if (lastFrameTime && data.timestamp) {
+		const date = new Date(data.timestamp * 1000);
+		lastFrameTime.textContent = date.toLocaleTimeString();
+	}
 });
 
 // Admin page logic here.

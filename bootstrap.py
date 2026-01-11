@@ -42,15 +42,15 @@ def shutdown_handler(signum, frame):
 @app.before_request
 def force_ssl_or_http():
     # Only allow HTTPS for /host, force HTTP for all others
-    if request.endpoint == 'host':
-        if request.scheme != 'https':
+    if request.endpoint == "host":
+        if request.scheme != "https":
             # Redirect to HTTPS
-            url = request.url.replace('http://', 'https://', 1)
+            url = request.url.replace("http://", "https://", 1)
             return redirect(url, code=301)
     else:
-        if request.scheme == 'https':
+        if request.scheme == "https":
             # Redirect to HTTP
-            url = request.url.replace('https://', 'http://', 1)
+            url = request.url.replace("https://", "http://", 1)
             return redirect(url, code=301)
 
 
@@ -81,8 +81,8 @@ def main():
     try:
         ssl_context = None
         # Only enable SSL if certs are present
-        cert_file = os.environ.get('SSL_CERT', 'cert.pem')
-        key_file = os.environ.get('SSL_KEY', 'key.pem')
+        cert_file = os.environ.get("SSL_CERT", "cert.pem")
+        key_file = os.environ.get("SSL_KEY", "key.pem")
         if os.path.exists(cert_file) and os.path.exists(key_file):
             ssl_context = (cert_file, key_file)
         socketio.run(

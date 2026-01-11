@@ -88,4 +88,4 @@ model.fit(X_train, y_train, epochs=100, batch_size=32, validation_data=(X_test, 
 
 
 # Save the weights
-model.save_weights('./checkpoints/wordmodels')
+model.save_weights('./WordModel/checkpoints/wordmodels')

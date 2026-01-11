@@ -127,16 +127,6 @@ def create_default_image():
 # Generate default image once at startup
 default_image = create_default_image()
 
-
-# Remove camera capture logic
-
-
-# Remove frame generation logic (handled by host stream now)
-
-
-# Remove camera thread and set_camera_id logic
-
-
 def set_sign_active(active):
     """Set whether hand sign detection is active"""
     global sign_active

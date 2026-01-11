@@ -39,8 +39,10 @@ host_logged_in = False
 # --- Utility & Auth Helpers ---
 def check_auth(username, password, role="admin"):
     if role == "admin":
+        print(f"Authenticating admin user: {username}, password: {password}")
         return username == "admin" and password == "admin"
     elif role == "host":
+        print(f"Authenticating host user: {username}, password: {password}")
         return username == "host" and password == "host"
     return False
 
@@ -290,6 +292,11 @@ def test():
 
 
 # --- Error Handlers ---
+@app.errorhandler(403)
+def forbidden(error):
+    return render_template("403.html"), 403
+
+
 @app.errorhandler(404)
 def not_found(error):
     return render_template("404.html"), 404

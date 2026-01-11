@@ -103,10 +103,8 @@ set_asl_transcript_callback(send_asl_transcript)
 def handle_host_frame(frame_bytes):
     # Store host stream frames in the same buffer as before
     frame_buffer.append(frame_bytes)
-    print(
-        f"Received host frame: {len(frame_bytes)} bytes (buffer size: {len(frame_buffer)})"
-    )
-    capture_hands(frame_bytes)
+    if sign_active == True:
+        capture_hands(frame_bytes)
     pass
 
 

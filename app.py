@@ -171,9 +171,7 @@ def capture_hands(curr_image):
     global total_x
     global double_letter
     global send
-    with mp_hands.Hands(
-        static_image_mode=True, max_num_hands=2, min_detection_confidence=0.5
-    ) as hands:
+    with get_hands_detector() as hands:
         # Read an image, flip it around y-axis for correct handedness output
         image = cv2.flip(cv2.imread(curr_image), 1)
         # Convert the BGR image to RGB before processing.

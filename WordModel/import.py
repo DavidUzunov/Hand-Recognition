@@ -33,7 +33,7 @@ def download_asl_videos(json_file, output_dir="MS-ASL/videos"):
             
             # Check if we already have it
             video_id = video_url.split("v=")[-1]
-            if os.path.exists(output_path / f"{video_id}.mp4"):
+            if os.path.exists(output_path / f"{video_id}.mp4") or os.path.exists(output_path / f"{video_id}.mkv") or os.path.exists(output_path / f"{video_id}.webm"):
                 continue
                 
             try:
@@ -45,6 +45,6 @@ def download_asl_videos(json_file, output_dir="MS-ASL/videos"):
 
 if __name__ == "__main__":
     # Point this to the file extracted by your previous script
-    json_path = "../Get-Data/MS-ASL/MSASL_train.json" # this is absolute path for my laptop only
+    json_path = "../Get-Data/MS-ASL/MSASL_train.json" # this is path for my laptop only
     print(json_path)
     download_asl_videos(json_path)

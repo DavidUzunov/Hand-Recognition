@@ -30,3 +30,15 @@
 	outline: none;
 	border-color: #764ba2;
 }
+
+/* Floating container for host page */
+.container {
+	background: #fff;
+	padding: 32px;
+	border-radius: 10px;
+	box-shadow: 0 10px 25px rgba(0, 0, 0, 0.18);
+	max-width: 700px;
+	margin: 90px auto 40px auto;
+	display: block;
+	position: relative;
+}

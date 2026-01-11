@@ -33,6 +33,16 @@
 	margin-top: 20px;
 }
 
+.container {
+	background: #fff;
+	padding: 32px;
+	border-radius: 10px;
+	box-shadow: 0 10px 25px rgba(0, 0, 0, 0.18);
+	max-width: 700px;
+	margin: 90px auto 40px auto;
+	position: relative;
+}
+
 .container .error-code,
 .container .error-title,
 .container .error-message,

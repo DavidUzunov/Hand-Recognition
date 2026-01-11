@@ -168,10 +168,9 @@ def handle_disconnect():
 @app.route("/host")
 @requires_auth(role="host")
 def host():
-    global host_logged_in
-    if host_logged_in:
+    # Only redirect if camera is actively streaming (frame_buffer has frames)
+    if len(frame_buffer) > 0:
         return redirect(url_for("admin"))
-    host_logged_in = True
     return render_template("host.html")
 
 

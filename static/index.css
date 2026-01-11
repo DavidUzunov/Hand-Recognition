@@ -197,3 +197,12 @@ body {
 	margin-left: auto;
 	margin-right: auto;
 }
+
+.main-title {
+	color: #667eea;
+	font-size: 2.5em;
+	margin-top: 0;
+	margin-bottom: 24px;
+	font-weight: 700;
+	text-align: center;
+}

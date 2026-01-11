@@ -183,6 +183,13 @@ def handle_toggle_sign(data):
         )
 
 
+@socketio.on("client_ping")
+def handle_client_ping(data):
+    """Respond to client-initiated ping with echo for RTT measurement."""
+    t0 = data.get("t0") if data else None
+    emit("client_pong", {"t0": t0, "server_ts": time.time()})
+
+
 @app.route("/debug")
 def debug():
     """Comprehensive debug endpoint that returns info about everything"""

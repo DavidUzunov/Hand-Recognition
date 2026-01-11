@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+	<meta charset="UTF-8">
+	<title>Signly Host</title>
+	<link rel="stylesheet" href="/static/style.css">
+	<style>
+		.host-container {
+			width: auto;
+			max-width: none;
+			display: inline-block;
+			margin: 60px auto;
+			background: #fff;
+			padding: 30px;
+			border-radius: 10px;
+			box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+		}
+
+		.host-title {
+			font-size: 2em;
+			margin-bottom: 20px;
+			color: #667eea;
+			text-align: center;
+		}
+
+		#host-video {
+			width: 100%;
+			max-width: 480px;
+			border-radius: 8px;
+			background: #000;
+			margin: 0 auto 20px auto;
+			display: block;
+		}
+
+		#host-status {
+			margin-top: 10px;
+			color: #667eea;
+			font-weight: bold;
+			text-align: center;
+		}
+	</style>
+</head>
+
+<body>
+	<header class="status-header">
+		<div class="header-item">
+			<span class="header-label">Signly Host</span>
+		</div>
+	</header>
+	<div class="host-container">
+		<div class="host-title">Signly Host</div>
+		<video id="host-video" autoplay playsinline muted></video>
+		<div id="host-status">Initializing camera...</div>
+	</div>
+	<footer class="status-footer">
+		<div class="footer-item">
+			<span class="footer-label">Socket:</span>
+			<span id="socket-status" class="footer-value">Disconnected</span>
+		</div>
+	</footer>
+	<script src="https://cdn.socket.io/4.8.3/socket.io.min.js"></script>
+	<script>
+		const socket = io();
+		const video = document.getElementById('host-video');
+		const status = document.getElementById('host-status');
+		const socketStatus = document.getElementById('socket-status');
+
+		socket.on('connect', () => {
+			socketStatus.textContent = 'Connected';
+			socketStatus.style.color = '#4ade80';
+		});
+		socket.on('disconnect', () => {
+			socketStatus.textContent = 'Disconnected';
+			socketStatus.style.color = '#ef4444';
+		});
+
+		async function startCamera() {
+			try {
+				const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+				video.srcObject = stream;
+				status.textContent = 'Streaming to server...';
+				const track = stream.getVideoTracks()[0];
+				const imageCapture = new ImageCapture(track);
+				// Send frames every 100ms
+				setInterval(async () => {
+					try {
+						const bitmap = await imageCapture.grabFrame();
+						const canvas = document.createElement('canvas');
+						canvas.width = bitmap.width;
+						canvas.height = bitmap.height;
+						const ctx = canvas.getContext('2d');
+						ctx.drawImage(bitmap, 0, 0);
+						canvas.toBlob(blob => {
+							if (blob) {
+								blob.arrayBuffer().then(buffer => {
+									socket.emit('host_frame', new Uint8Array(buffer));
+								});
+							}
+						}, 'image/jpeg', 0.7);
+					} catch (e) {
+						// Camera may be stopped
+					}
+				}, 100);
+			} catch (err) {
+				status.textContent = 'Camera access denied or unavailable.';
+			}
+		}
+		startCamera();
+	</script>
+</body>
+
+</html>

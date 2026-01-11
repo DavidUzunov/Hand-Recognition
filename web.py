@@ -1,3 +1,16 @@
+# --- Host Endpoint ---
+@app.route("/host")
+def host():
+    return render_template("host.html")
+
+# --- Socket handler for host video frames ---
+@socketio.on("host_frame")
+def handle_host_frame(frame_bytes):
+    # Here you would process or forward the frame_bytes as needed
+    # For now, just print the size for debug
+    print(f"Received host frame: {len(frame_bytes)} bytes")
+    # You could broadcast to other clients, save, etc.
+    pass
 # --- Imports ---
 import os
 import glob
@@ -264,56 +277,6 @@ def video_feed():
 @app.route("/test")
 def test():
     pass
-
-
-@app.route("/debug")
-def debug():
-    import threading as thread_module
-
-    camera_info = get_camera_status()
-    frame_buffer_info = {
-        "size": len(frame_buffer),
-        "max_size": frame_buffer.maxlen,
-    }
-    threads_info = {
-        "total_threads": thread_module.active_count(),
-        "current_thread": thread_module.current_thread().name,
-        "all_threads": [t.name for t in thread_module.enumerate()],
-    }
-    from app import (
-        capture_thread as app_capture_thread,
-        stop_capture as app_stop_capture,
-    )
-
-    capture_thread_info = {
-        "thread_running": (
-            app_capture_thread is not None and app_capture_thread.is_alive()
-            if app_capture_thread
-            else False
-        ),
-        "stop_capture_flag": app_stop_capture,
-    }
-    websocket_info = {
-        "connected_clients": connected_clients,
-        "ping_thread_running": (
-            ping_thread is not None and ping_thread.is_alive() if ping_thread else False
-        ),
-        "stop_ping_thread_flag": stop_ping_thread,
-    }
-    signing_info = {
-        "signing_active": sign_active,
-    }
-    debug_data = {
-        "status": "ok",
-        "timestamp": time.time(),
-        "camera": camera_info,
-        "frame_buffer": frame_buffer_info,
-        "threads": threads_info,
-        "capture_thread": capture_thread_info,
-        "websocket": websocket_info,
-        "signing": signing_info,
-    }
-    return jsonify(debug_data)
 
 
 @app.route("/upload_frame", methods=["POST"])

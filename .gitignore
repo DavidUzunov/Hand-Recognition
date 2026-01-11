@@ -5,3 +5,5 @@ lib64
 pyvenv.cfg
 # training data
 /MS-ASL
+/WLASL-landmarks
+/WLASL_top1000

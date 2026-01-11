@@ -96,4 +96,4 @@ def bulk_process_dataset(input_dir, output_dir):
         np.save(save_name, landmarks)
 
 # Run the process
-bulk_process_dataset("../Get-Data/WLASL/wlasl-complete/videos", "WLASL-landmarks")
+bulk_process_dataset("WLASL_top1000", "WLASL-landmarks")

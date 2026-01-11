@@ -2,7 +2,7 @@
 
 Hand gesture recognition and sign language interpretation live stream.
 
-[SBHacks XII](https://sbhacks.com/)
+[SB Hacks XII](https://sbhacks.com/)
 
 [Devpost](https://devpost.com/software/signly-x6eo92)
 

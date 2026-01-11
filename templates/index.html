@@ -38,22 +38,16 @@
 
 	<div class="container">
 		<div class="main-title">Signly Stream</div>
-		<div class="content-wrapper">
-			<div class="main-content">
+		<div class="content-wrapper two-column-layout">
+			<div class="main-content left-col">
 				<div class="video-container">
 					<img id="video-feed" alt="Live Camera Feed" src="/video_feed"
 						onerror="this.onerror=null;this.src='/no_camera';">
 				</div>
 				<button id="ping-button" onclick="pingServer()" style="display:none;">Ping Server</button>
 				<div id="response"></div>
-				<div class="controls-section controls-row" style="justify-content: center; background: white;">
-					<div class="controls-right" style="flex: 1; display: flex; justify-content: flex-end;">
-						<button id="toggle-transcript" class="toggle-transcript"
-							title="Show/hide transcript">&#187;</button>
-					</div>
-				</div>
 			</div>
-			<div id="transcript-sidebar" class="sidebar">
+			<div class="right-col transcript-panel">
 				<div class="text-output">
 					<textarea id="message-box" readonly rows="25" cols="40"></textarea>
 					<div class="transcript-buttons">

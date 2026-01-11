@@ -71,6 +71,7 @@ set_asl_transcript_callback(send_asl_transcript)
 @socketio.on("host_frame")
 def handle_host_frame(frame_bytes):
     global sign_active
+    global frame_byte_q
     # Store host stream frames in the same buffer as before
     frame_buffer.append(frame_bytes)
     # Emit FPS and last frame time to all clients
@@ -94,7 +95,10 @@ def handle_host_frame(frame_bytes):
     min_interval = 1.0 / 15.0
     if sign_active:
         if now - handle_host_frame._last_hand_time >= min_interval:
-            capture_hands(frame_bytes)
+            if frame_byte_q.full() == False:
+            	frame_byte_q.put(frame_bytes)
+             else:
+				pass
             handle_host_frame._last_hand_time = now
     # ---
     pass

@@ -32,7 +32,7 @@ def get_hands_detector():
 
 # Memory buffer to store frames (max 30 frames)
 frame_buffer = deque(maxlen=30)  # JPG bytes
-frame_byte_q = Queue()
+frame_byte_q = Queue(maxsize=5)
 
 
 # Only keep sign_active for state
@@ -168,13 +168,14 @@ def get_letter(data):
     curr_letter = LETTERS[id]
 
 
-def capture_hands(curr_image):
+def capture_hands(frame_byte_q):
     global last_letter
     global curr_letter
     global last_x
     global total_x
     global double_letter
     global send
+    curr_image = frame_byte_q.get()
     with get_hands_detector() as hands:
         # Read an image, flip it around y-axis for correct handedness output
         nparr = np.frombuffer(curr_image, np.uint8)

@@ -39,10 +39,8 @@ host_logged_in = False
 # --- Utility & Auth Helpers ---
 def check_auth(username, password, role="admin"):
     if role == "admin":
-        print(f"Authenticating admin user: {username}, password: {password}")
         return username == "admin" and password == "admin"
     elif role == "host":
-        print(f"Authenticating host user: {username}, password: {password}")
         return username == "host" and password == "host"
     return False
 

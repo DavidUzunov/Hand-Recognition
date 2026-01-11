@@ -23,16 +23,25 @@ socket.on('ping', (data) => {
 socket.on('camera_status', (data) => {
 	console.log('Received camera status:', data);
 	updateCameraStatus(data);
-	const cameraFooter = document.getElementById('camera-status-footer');
-	if (cameraFooter) {
-		cameraFooter.textContent = data.camera_available ? 'Available' : 'Unavailable';
-		cameraFooter.style.color = data.camera_available ? '#4ade80' : '#ef4444';
+	const cameraHeader = document.getElementById('camera-status-header');
+	const selectedCamera = document.getElementById('selected-camera');
+	if (cameraHeader) {
+		cameraHeader.textContent = data.camera_available ? 'Available' : 'Unavailable';
+		cameraHeader.style.color = data.camera_available ? '#4ade80' : '#ef4444';
+	}
+	if (selectedCamera && data.camera_available) {
+		selectedCamera.textContent = `/dev/video${data.camera_id}`;
 	}
 });
 
 socket.on('sign_status', (data) => {
 	console.log('Received sign status:', data);
 	updateSignButton(data.signing_active);
+	const signingStatus = document.getElementById('signing-status');
+	if (signingStatus) {
+		signingStatus.textContent = data.signing_active ? 'Active' : 'Inactive';
+		signingStatus.style.color = data.signing_active ? '#4ade80' : '#fbbf24';
+	}
 });
 
 socket.on('asl_transcript', (data) => {
@@ -43,6 +52,9 @@ socket.on('asl_transcript', (data) => {
 		messageBox.value += `[${timestamp}] ${data.message}\n`;
 		// Auto-scroll to bottom
 		messageBox.scrollTop = messageBox.scrollHeight;
+		// Update line count
+		const lines = messageBox.value.split('\n').filter(line => line.trim()).length;
+		document.getElementById('transcript-lines').textContent = lines;
 	}
 });
 
@@ -202,6 +214,7 @@ function clearTranscript() {
 	const messageBox = document.getElementById('message-box');
 	if (messageBox) {
 		messageBox.value = '';
+		document.getElementById('transcript-lines').textContent = '0';
 	}
 }
 

@@ -12,6 +12,25 @@
 </head>
 
 <body>
+	<header class="status-header">
+		<div class="header-item">
+			<span class="header-label">Camera:</span>
+			<span id="camera-status-header" class="header-value">Unknown</span>
+		</div>
+		<div class="header-item">
+			<span class="header-label">Selected:</span>
+			<span id="selected-camera" class="header-value">-</span>
+		</div>
+		<div class="header-item">
+			<span class="header-label">Signing:</span>
+			<span id="signing-status" class="header-value">Inactive</span>
+		</div>
+		<div class="header-item">
+			<span class="header-label">Transcript Lines:</span>
+			<span id="transcript-lines" class="header-value">0</span>
+		</div>
+	</header>
+
 	<div class="container">
 		<h1>Signly</h1>
 		<div class="content-wrapper">
@@ -62,10 +81,6 @@
 		<div class="footer-item">
 			<span class="footer-label">Last Frame:</span>
 			<span id="last-frame-time" class="footer-value">-</span>
-		</div>
-		<div class="footer-item">
-			<span class="footer-label">Camera:</span>
-			<span id="camera-status-footer" class="footer-value">Unknown</span>
 		</div>
 	</footer>
 

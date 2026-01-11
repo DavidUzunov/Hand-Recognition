@@ -5,10 +5,12 @@ import numpy as np
 import threading
 import time
 import glob
+import tensorflow as tf
 
 mp_drawing = mp.solutions.drawing_utils
 mp_drawing_styles = mp.solutions.drawing_styles
 mp_hands = mp.solutions.hands
+model = tf.keras.models.load_model("model/asl_model.h5")
 
 # Global MediaPipe Hands instance (lazy loaded on first use)
 _hands_detector = None
@@ -47,6 +49,7 @@ curr_x = 0
 double_letter = False
 curr_letter = ""
 last_letter = ""
+LETTERS = ["A", 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z']
 
 
 def detect_available_cameras():
@@ -302,6 +305,10 @@ def process_hand_data(hand):
     return np.array(data_list).reshape(1, -1)
 
 
+def get_letter(data):
+    prediction = model.predict(data, verbose = 0)
+    id = np.argmax(p)
+
 def capture_hands(curr_image):
     # this will be thing that stores all images, placeholder for now
     with mp_hands.Hands(
@@ -316,6 +323,7 @@ def capture_hands(curr_image):
             return
         primary_hand = results.multi_hand_landmarks[0]
         data = process_hand_data(primary_hand)
+        get_letter(data)
         send = False
         if curr_letter != last_letter:
             if total_x >= 0.15:
@@ -324,7 +332,9 @@ def capture_hands(curr_image):
             total_x = 0
             if curr_letter == " ":
                 send = True
-            transcribe(last_letter, double_letter, send)
+            if last_letter.isspace() == False:
+                curr_letter = curr_letter.lower()
+            transcribe(curr_letter, double_letter, send)
             double_letter = False
             last_letter = curr_letter
         # checks for double letters via wrist data

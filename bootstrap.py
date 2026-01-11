@@ -11,8 +11,6 @@ from app import start_camera_capture
 from web import app, socketio
 import web as web_module
 import os
-from flask import request, redirect
-import ssl
 
 
 def shutdown_handler(signum, frame):
@@ -36,22 +34,6 @@ def shutdown_handler(signum, frame):
     print("Shutdown complete. Goodbye!")
     print("=" * 60)
     sys.exit(0)
-
-
-# --- SSL/Redirect logic ---
-@app.before_request
-def force_ssl_or_http():
-    # Only allow HTTPS for /host, force HTTP for all others
-    if request.endpoint == "host":
-        if request.scheme != "https":
-            # Redirect to HTTPS
-            url = request.url.replace("http://", "https://", 1)
-            return redirect(url, code=301)
-    else:
-        if request.scheme == "https":
-            # Redirect to HTTP
-            url = request.url.replace("https://", "http://", 1)
-            return redirect(url, code=301)
 
 
 def main():

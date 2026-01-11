@@ -37,8 +37,8 @@
 	padding: 32px;
 	border-radius: 10px;
 	box-shadow: 0 10px 25px rgba(0, 0, 0, 0.18);
-	max-width: 700px;
-	margin: 90px auto 40px auto;
-	display: block;
+	max-width: 700px !important;
+	margin: 90px auto 40px auto !important;
+	display: block !important;
 	position: relative;
 }

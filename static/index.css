@@ -130,8 +130,8 @@ img#video-feed {
 .header-nav {
 	position: absolute;
 	top: 10px;
-	padding: 8px 22px;
-	font-size: 1.1em;
+	padding: 5px 14px;
+	font-size: 1em;
 	background: #fff;
 	color: #667eea;
 	border-radius: 5px;
@@ -205,4 +205,19 @@ body {
 	margin-bottom: 24px;
 	font-weight: 700;
 	text-align: center;
+}
+
+@media (max-width: 600px) {
+  .header-nav {
+    padding: 4px 7px;
+    font-size: 0.95em;
+    max-width: 90px;
+  }
+  .header-nav-right {
+    right: 4px;
+    max-width: 70px;
+  }
+  .header-nav-left {
+    left: 4px;
+  }
 }

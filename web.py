@@ -35,37 +35,6 @@ stop_ping_thread = False
 # Track if a host is logged in
 host_logged_in = False
 
-
-# --- Utility & Auth Helpers ---
-def check_auth(username, password, role="admin"):
-    if role == "admin":
-        return username == "admin" and password == "admin"
-    elif role == "host":
-        return username == "host" and password == "host"
-    return False
-
-
-def authenticate(role="admin"):
-    realm = "Host Login" if role == "host" else "Login Required"
-    resp = Response(render_template("401.html"), 401)
-    resp.headers["WWW-Authenticate"] = f'Basic realm="{realm}"'
-    return resp
-
-
-def requires_auth(role="admin"):
-    def decorator(f):
-        @wraps(f)
-        def decorated(*args, **kwargs):
-            auth = request.authorization
-            if not auth or not check_auth(auth.username, auth.password, role=role):
-                return authenticate(role=role)
-            return f(*args, **kwargs)
-
-        return decorated
-
-    return decorator
-
-
 def send_asl_transcript(message):
     if connected_clients > 0:
         with app.app_context():
@@ -162,21 +131,15 @@ def handle_disconnect():
 # --- Host Endpoint ---
 @app.route("/host")
 def host():
-    key = request.args.get("key")
-    if key != "123":
-        return render_template("401.html"), 401
     # Only redirect if camera is actively streaming (frame_buffer has frames)
     if len(frame_buffer) > 0:
-        return redirect(url_for("admin", key=key))
+        return redirect(url_for("admin"))
     return render_template("host.html")
 
 
 # --- Admin Endpoint ---
 @app.route("/admin")
 def admin():
-    key = request.args.get("key")
-    if key != "123":
-        return render_template("401.html"), 401
     status = None
     debug_data = None
     # Get debug info for admin page
@@ -289,16 +252,6 @@ def test():
 
 
 # --- Error Handlers ---
-@app.errorhandler(401)
-def unauthorized(error):
-    return render_template("401.html"), 401
-
-
-@app.errorhandler(403)
-def forbidden(error):
-    return render_template("403.html"), 403
-
-
 @app.errorhandler(404)
 def not_found(error):
     return render_template("404.html"), 404

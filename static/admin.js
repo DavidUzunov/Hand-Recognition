@@ -2,10 +2,24 @@
 // import './common.js';
 
 // Admin-specific JS
-const adminSocket = io();
+function getKeyParam() {
+	const url = new URL(window.location.href);
+	return url.searchParams.get('key') || '';
+}
+const adminSocket = io({
+	query: { key: getKeyParam() }
+});
 const toggleBtn = document.getElementById('toggle-asl-btn');
 const cameraSelect = document.getElementById('camera_id');
 const transcribeMode = document.getElementById('transcribe-mode');
+const socketStatus = document.getElementById('socket-status');
+
+adminSocket.on('connect', function () {
+	if (socketStatus) socketStatus.textContent = 'Connected';
+});
+adminSocket.on('disconnect', function () {
+	if (socketStatus) socketStatus.textContent = 'Disconnected';
+});
 
 function setTranscriptionControlsDisabled(disabled) {
 	if (cameraSelect) cameraSelect.disabled = disabled;

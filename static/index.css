@@ -127,34 +127,6 @@ img#video-feed {
 	background-color: white;
 }
 
-.header-nav {
-	position: absolute;
-	top: 10px;
-	padding: 5px 14px;
-	font-size: 1em;
-	background: #fff;
-	color: #667eea;
-	border-radius: 5px;
-	font-weight: bold;
-	text-decoration: none;
-	box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
-	transition: background 0.2s, color 0.2s;
-	z-index: 1001;
-}
-
-.header-nav-left {
-	left: 18px;
-}
-
-.header-nav-right {
-	right: 58px;
-}
-
-.header-nav:hover {
-	background: #667eea;
-	color: #fff;
-}
-
 .status-header {
 	position: fixed;
 	top: 0;
@@ -205,19 +177,4 @@ body {
 	margin-bottom: 24px;
 	font-weight: 700;
 	text-align: center;
-}
-
-@media (max-width: 600px) {
-  .header-nav {
-    padding: 4px 7px;
-    font-size: 0.95em;
-    max-width: 90px;
-  }
-  .header-nav-right {
-    right: 4px;
-    max-width: 70px;
-  }
-  .header-nav-left {
-    left: 4px;
-  }
 }

@@ -1,10 +1,17 @@
+"""
+Hand Recognition Application - Frame Capture and Streaming
+Main responsibility: Capture frames from camera/host and stream them via HTTP/WebSocket
+"""
+
 from collections import deque
 import cv2
 import mediapipe as mp
-# mediapipe changed its top-level API in 0.10+: the legacy `mp.solutions` API
-# may not be available. Try to use it if present; otherwise fall back to
-# disabling landmark drawing so the server can run. The app can be extended
-# later to use `mediapipe.tasks.python` for landmarking if desired.
+import numpy as np
+import threading
+import time
+import glob
+
+# Try to load mediapipe solutions (may not be available in some versions)
 try:
 	mp_drawing = mp.solutions.drawing_utils
 	mp_drawing_styles = mp.solutions.drawing_styles
@@ -16,196 +23,30 @@ except Exception:
 	mp_hands = None
 	mediapipe_has_solutions = False
 	print("Warning: mediapipe.solutions not available; hand landmark drawing disabled.")
-import numpy as np
-import threading
-import time
-import glob
-import tensorflow as tf
-from multiprocessing import Process, Queue
-
-mp_drawing = mp.solutions.drawing_utils
-mp_drawing_styles = mp.solutions.drawing_styles
-mp_hands = mp.solutions.hands
-
-# 1. CREATE A CENTRALIZED THREAD-SAFE GESTURE PROCESSOR
-from queue import Queue
-from dataclasses import dataclass
-from typing import Optional
-
-@dataclass
-class GestureFrame:
-    timestamp: float
-    hand_landmarks: list
-    frame_id: int
-
-class ThreadSafeGestureProcessor:
-    def __init__(self, model_path):
-        self.lock = threading.RLock()
-        self.model = tf.keras.models.load_model(model_path)
-        self.gesture_queue = Queue(maxsize=30)
-        self.current_word = ""
-        self.gesture_buffer = []
-        self.last_gesture = None
-        self.silence_threshold = 0.5  # seconds
-        self.last_gesture_time = 0
-        
-    def add_gesture(self, frame: GestureFrame):
-        """Thread-safe gesture addition"""
-        try:
-            self.gesture_queue.put_nowait(frame)
-        except:
-            pass  # Queue full, drop frame
-    
-    def process(self):
-        """Run in dedicated processing thread"""
-        while True:
-            try:
-                frame = self.gesture_queue.get(timeout=1.0)
-                with self.lock:
-                    self._process_landmarks(frame)
-                    self._check_word_boundary()
-            except:
-                with self.lock:
-                    self._check_word_boundary()  # Force boundary on silence
-    
-    def get_transcript(self):
-        """Thread-safe transcript retrieval"""
-        with self.lock:
-            return self.current_word
-    
-    def reset(self):
-        """Thread-safe reset"""
-        with self.lock:
-            self.current_word = ""
-            self.gesture_buffer = []
-
-# 2. SEPARATE FRAME CAPTURE FROM HAND PROCESSING
-# - Frame capture thread: just reads camera frames into a thread-safe buffer
-# - Hand processing thread: reads from buffer, detects hands, predicts letters
-# - Gesture processing thread: accumulates letters into words, sends callbacks
-
-# 3. USE PROPER SYNCHRONIZATION FOR GLOBAL STATE
-# Replace global variables with a thread-safe state manager:
-class AppState:
-    def __init__(self):
-        self.lock = threading.RLock()
-        self._sign_active = True
-        self._connected_clients = 0
-        self._host_logged_in = False
-    
-    @property
-    def sign_active(self):
-        with self.lock:
-            return self._sign_active
-    
-    @sign_active.setter
-    def sign_active(self, value):
-        with self.lock:
-            self._sign_active = value
-    
-    # Similar for other properties...
-
-# 4. IMPROVE WORD BOUNDARY DETECTION
-# Instead of motion tracking (total_x), use:
-# - Gesture duration: If same letter for >500ms, it's a double letter
-# - Silence detection: If no hand detected for >500ms, end word
-# - Space gesture: Define specific gesture as word separator (or use timeout)
-
-# 5. ENHANCE MODEL INTEGRATION
-# Load model in dedicated thread and use thread-safe inference:
-class ThreadSafeModel:
-    def __init__(self, model_path):
-        self.lock = threading.Lock()
-        self.model = tf.keras.models.load_model(model_path)
-        self.graph = tf.compat.v1.get_default_graph()
-    
-    def predict(self, data):
-        with self.lock:
-            with self.graph.as_default():
-                return self.model.predict(data, verbose=0)
 
 
-# Global MediaPipe Hands instance (lazy loaded on first use)
-_hands_detector = None
-_hands_detector_lock = threading.Lock()
+# ============================================================================
+# GLOBAL STATE (frame buffer for web server)
+# ============================================================================
 
-def get_hands_detector():
-	"""Get or create the global Hands detector instance (thread-safe)"""
-	global _hands_detector
-	with _hands_detector_lock:
-		if _hands_detector is None:
-			print("Initializing MediaPipe Hands detector...")
-			_hands_detector = mp_hands.Hands(
-				static_image_mode=True, max_num_hands=2, min_detection_confidence=0.5
-			)
-			print("MediaPipe Hands detector ready")
-		return _hands_detector
+# Memory buffer to store frames (max 30 frames as JPEG bytes)
+frame_buffer = deque(maxlen=30)
 
+# Camera state variables
+cap = None
+current_frame = None
+camera_available = False
+camera_id = 0
+stop_capture = False
+frame_lock = threading.Lock()
+capture_thread = None
 
-# Memory buffer to store frames (max 30 frames)
-frame_buffer = deque(maxlen=30)  # JPG bytes
-frame_byte_q = Queue(maxsize=5)
+# Sign active flag - whether to process hand signs
+sign_active = True
 
-
-# Only keep sign_active for state
-sign_active = True  # Track if hand signing capture is active (default ON)
-
-# Global variables for hand-tracking/transcribing
-curr_word = ""
-last_x = 0
-total_x = 0
-curr_x = 0
-double_letter = False
-curr_letter = ""
-last_letter = ""
-LETTERS = [
-	"A",
-	"B",
-	"C",
-	"D",
-	"E",
-	"F",
-	"G",
-	"H",
-	"I",
-	"J",
-	"K",
-	"L",
-	"M",
-	"N",
-	"O",
-	"P",
-	"Q",
-	"R",
-	"S",
-	"T",
-	"U",
-	"V",
-	"W",
-	"X",
-	"Y",
-	"Z",
-]
-
-
-# Remove camera detection logic
-
-
-last_x = 0
-total_x = 0
-curr_x = 0
-double_letter = False
-curr_letter = "a"  # placeholder value --> will store actual current letter
-last_letter = "b"  # ditto
-
-# Callback function for sending ASL transcript (set by web.py to avoid circular import)
-asl_transcript_callback = None
-
-
-def set_asl_transcript_callback(callback):
-	"""Set the callback function for sending ASL transcripts"""
-	global asl_transcript_callback
-	asl_transcript_callback = callback
+# ============================================================================
+# UTILITY FUNCTIONS
+# ============================================================================
 
 
 def create_default_image():
@@ -272,9 +113,14 @@ def set_default_camera():
 		print("No cameras detected; will use default image until a camera is connected.")
 
 
+# ============================================================================
+# FRAME CAPTURE (from local camera or WebSocket host stream)
+# ============================================================================
+
+
 def capture_frames():
 	"""Continuously capture frames from USB webcam (Raspberry Pi compatible)"""
-	global cap, current_frame, camera_available, camera_id, stop_capture, model_frame
+	global cap, current_frame, camera_available, camera_id, stop_capture
 
 	# Helper to try opening a device id
 	def try_open(dev_id):
@@ -333,18 +179,10 @@ def capture_frames():
 				# Store frame in buffer (jpeg bytes)
 				_, jpeg = cv2.imencode(".jpg", frame)
 				frame_buffer.append(jpeg.tobytes())
-				# Prepare a model-ready RGB float32 frame (224x224 normalized)
-				try:
-					rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-					small = cv2.resize(rgb, (224, 224), interpolation=cv2.INTER_LINEAR)
-					model_frame = small.astype(np.float32) / 255.0
-				except Exception:
-					model_frame = None
 				print(f"Got image - Buffer size: {len(frame_buffer)}")
 		else:
 			with frame_lock:
 				current_frame = default_image.copy()
-				model_frame = None
 			time.sleep(0.1)
 
 	if cap is not None:
@@ -355,7 +193,7 @@ def capture_frames():
 
 
 def generate_frames():
-	"""Generate frames for streaming and optionally process hands"""
+	"""Generate frames for streaming and optionally process hands for visualization"""
 	# Only create the legacy `Hands` detector if the `mp.solutions` API
 	# is available. If not, skip hand processing (server still runs).
 	hands = None
@@ -374,7 +212,7 @@ def generate_frames():
 			is_default_image = not camera_available
 
 		# Process hand detection if signing is active and the legacy
-		# `mp.solutions` API is available.
+		# `mp.solutions` API is available. This draws hand landmarks on the frame.
 		if (
 			sign_active
 			and frame_to_process is not None
@@ -427,7 +265,9 @@ def generate_frames():
 			time.sleep(0.1)  # 1 second delay for default image
 		else:
 			time.sleep(0.033)  # ~30 fps for camera feed
-	hands.close()
+	
+	if hands is not None:
+		hands.close()
 
 
 def start_camera_capture():
@@ -455,81 +295,6 @@ def set_camera_id(new_id):
 
 
 def set_sign_active(active):
-	# Set whether hand sign detection is active
+	"""Set whether hand sign detection/visualization is active"""
 	global sign_active
 	sign_active = active
-
-
-def transcribe(letter, double_letter, send):
-	# this will transcribe letters
-	global curr_word
-	if letter == " ":
-		return
-	else:
-		curr_word = curr_word + letter
-		if double_letter == True:
-			curr_word = curr_word + letter
-		if send == True:
-			if asl_transcript_callback is not None:
-				asl_transcript_callback(curr_word)
-
-
-def process_hand_data(hand):
-	data_list = []
-	# normalizes the data via the wrist for better model processing (wrist is (0,0,0))
-	for measurement in hand.landmark:
-		data_list.append(measurement.x - hand.landmark[0].x)
-		data_list.append(measurement.y - hand.landmark[0].y)
-		data_list.append(measurement.z - hand.landmark[0].z)
-	return np.array(data_list).reshape(1, -1)
-
-
-def get_letter(data):
-	global curr_letter
-	prediction = model.predict(data, verbose=0)
-	id = np.argmax(prediction)
-	curr_letter = LETTERS[id]
-
-
-def capture_hands(frame_byte_q):
-	global last_letter
-	global curr_letter
-	global last_x
-	global total_x
-	global double_letter
-	global send
-	while True:
-		curr_image = frame_byte_q.get(block=True)
-		with get_hands_detector() as hands:
-			# Read an image, flip it around y-axis for correct handedness output
-			nparr = np.frombuffer(curr_image, np.uint8)
-			image = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
-			if image is None:
-				return
-			image = cv2.flip(image, 1)
-			# Convert the BGR image to RGB before processing.
-			results = hands.process(cv2.cvtColor(image, cv2.COLOR_BGR2RGB))
-			if not results.multi_hand_landmarks:
-				return
-			primary_hand = results.multi_hand_landmarks[0]
-			data = process_hand_data(primary_hand)
-			get_letter(data)
-			send = False
-			if curr_letter != last_letter:
-				if total_x >= 0.15:
-					double_letter = True
-				if curr_letter.isspace() == True:
-					send = True
-				if last_letter.isspace() == False:
-					curr_letter = curr_letter.lower()
-				transcribe(curr_letter, double_letter, send)
-				last_x = 0
-				total_x = 0
-				double_letter = False
-				last_letter = curr_letter
-			# checks for double letters via wrist data
-			if curr_letter == last_letter:
-				curr_x = primary_hand.landmark[0].x
-				total_x = total_x + (curr_x - last_x)
-				last_x = curr_x
-			curr_x = 0

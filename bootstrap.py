@@ -8,6 +8,9 @@ import signal
 import sys
 import os
 
+# Disable TensorFlow's oneDNN optimizations which can cause shutdown issues
+os.environ['TF_ENABLE_ONEDNN_OPTS'] = '0'
+
 # If a `.venv` exists in the workspace, automatically re-exec this script with
 # that interpreter so users who run `python bootstrap.py` from system Python
 # get the correct environment and avoid "module not found" errors.
@@ -26,35 +29,61 @@ from web import app, socketio
 import web as web_module
 import os
 import threading
-from multiprocessing import Process
+import time
+import atexit
+
+
+# Exit handler to prevent TensorFlow cleanup crashes
+def exit_handler():
+	"""Clean exit handler"""
+	try:
+		import os
+		os._exit(0)  # Force exit without cleanup
+	except:
+		pass
+
+
+atexit.register(exit_handler)
 
 
 def shutdown_handler(signum, frame):
-	global p1
 	"""Handle graceful shutdown on SIGINT or SIGTERM"""
 	print("\n" + "=" * 60)
 	print("Shutting down Hand Recognition Application...")
 	print("=" * 60)
 
-	# Stop camera capture
-	print("Stopping camera capture...")
-	app_module.stop_capture = True
+	try:
+		# Stop camera capture
+		print("Stopping camera capture...")
+		app_module.stop_capture = True
+		if app_module.capture_thread and app_module.capture_thread.is_alive():
+			app_module.capture_thread.join(timeout=2.0)
 
-	# Stop ping thread
-	print("Stopping WebSocket ping thread...")
-	web_module.stop_ping_thread = True
+		# Stop gesture processor (daemon thread will stop automatically)
+		print("Stopping gesture processor...")
+		# gesture_processor thread is daemon, will stop automatically
 
-	# Terminate camera process
-	print("Terminating camera process...")
-	p1.terminate()
+		# Stop ping thread
+		print("Stopping WebSocket ping thread...")
+		web_module.stop_ping_thread = True
 
-	# Disconnect all WebSocket clients
-	print("Disconnecting WebSocket clients...")
-	socketio.emit("disconnecting", {"message": "Server shutting down"}, to=None)
+		# Disconnect all WebSocket clients
+		print("Disconnecting WebSocket clients...")
+		try:
+			with app.app_context():
+				socketio.emit("disconnecting", {"message": "Server shutting down"}, to=None)
+		except Exception as e:
+			print(f"Error emitting disconnect message: {e}")
 
-	print("Shutdown complete. Goodbye!")
-	print("=" * 60)
-	sys.exit(0)
+		print("Shutdown complete. Goodbye!")
+		print("=" * 60)
+		time.sleep(0.5)  # Brief delay to allow cleanup
+	except Exception as e:
+		print(f"Error during shutdown: {e}")
+		import traceback
+		traceback.print_exc()
+	finally:
+		sys.exit(0)
 
 
 def run_http():
@@ -79,7 +108,6 @@ def run_https():
 
 
 def main():
-	global p1
 	"""Initialize camera and start the web server"""
 	print("=" * 60)
 	print("Starting Hand Recognition Application (Signly)")
@@ -89,7 +117,8 @@ def main():
 	signal.signal(signal.SIGINT, shutdown_handler)
 	signal.signal(signal.SIGTERM, shutdown_handler)
 
-	# Camera logic removed: only host stream is used
+	# Start camera capture thread (if local camera is available)
+	app_module.start_camera_capture()
 
 	# Start Flask web server with WebSocket support
 	print("Starting web server on https://0.0.0.0:5000")
@@ -97,9 +126,15 @@ def main():
 	print("Press Ctrl+C to shutdown gracefully")
 	print("=" * 60)
 
-	run_https()
-	p1 = Process(target=app_module.capture_hands, args=(app_module.frame_byte_q,))
-	p1.start()
+	try:
+		run_https()
+	except KeyboardInterrupt:
+		shutdown_handler(None, None)
+	except Exception as e:
+		print(f"Server error: {e}")
+		import traceback
+		traceback.print_exc()
+		shutdown_handler(None, None)
 
 
 if __name__ == "__main__":

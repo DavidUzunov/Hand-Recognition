@@ -4,6 +4,7 @@ import glob
 import cv2
 import threading
 import time
+import numpy as np
 from functools import wraps
 from flask import (
 	Flask,
@@ -16,16 +17,23 @@ from flask import (
 	url_for,
 )
 from flask_socketio import SocketIO, emit
+from queue import Queue
+import mediapipe as mp
+
+try:
+	mp_hands = mp.solutions.hands
+	mediapipe_has_solutions = True
+except Exception:
+	mp_hands = None
+	mediapipe_has_solutions = False
+	print("Warning: mediapipe.solutions not available")
+
 from app import (
 	frame_buffer,
 	sign_active,
 	set_sign_active,
 	create_default_image,
-	set_asl_transcript_callback,
-	capture_hands,
-	frame_byte_q
 )
-from queue import Queue
 from gesture_processor import ThreadSafeGestureProcessor, GestureFrame
 
 # --- App Setup ---
@@ -70,25 +78,37 @@ def get_camera_status():
 	}
 
 
-set_asl_transcript_callback(send_asl_transcript)
-
 # Start gesture processor at startup
-gesture_processor = ThreadSafeGestureProcessor("model/asl_model.h5")
+gesture_processor = ThreadSafeGestureProcessor("models/asl_model.h5")
+gesture_processor.set_callback(send_asl_transcript)
 processor_thread = threading.Thread(
 	target=gesture_processor.process, daemon=True
 )
 processor_thread.start()
 
+# Initialize MediaPipe Hands if available
+hands = None
+if mediapipe_has_solutions and mp_hands is not None:
+	try:
+		hands = mp_hands.Hands(
+			static_image_mode=False, 
+			max_num_hands=2, 
+			min_detection_confidence=0.5
+		)
+		print("MediaPipe Hands initialized successfully")
+	except Exception as e:
+		print(f"Failed to initialize MediaPipe Hands: {e}")
+		hands = None
+
 # --- Socket Handlers ---
 @socketio.on("host_frame")
 def handle_host_frame(frame_bytes):
 	global sign_active
-	global frame_byte_q
 	# Store host stream frames in the same buffer as before
 	frame_buffer.append(frame_bytes)
 	
 	# Detect hands and add to gesture processor
-	if sign_active:
+	if sign_active and hands is not None:
 		try:
 			nparr = np.frombuffer(frame_bytes, np.uint8)
 			image = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
@@ -118,21 +138,6 @@ def handle_host_frame(frame_bytes):
 		handle_host_frame._last_time = now
 		handle_host_frame._frame_count = 0
 	socketio.emit("last_frame", {"timestamp": now})
-
-	# --- Rate limit hand capture to 15 fps ---
-	if not hasattr(handle_host_frame, "_last_hand_time"):
-		handle_host_frame._last_hand_time = 0
-	min_interval = 1.0 / 15.0
-	if sign_active:
-		if now - handle_host_frame._last_hand_time >= min_interval:
-			if frame_byte_q.full() == False:
-				frame_byte_q.put(frame_bytes)
-			else:
-				print("Dropped frame")
-				pass
-			handle_host_frame._last_hand_time = now
-	# ---
-	pass
 
 
 @socketio.on("get_sign_status")

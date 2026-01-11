@@ -11,7 +11,6 @@ from multiprocessing import Process, Queue
 mp_drawing = mp.solutions.drawing_utils
 mp_drawing_styles = mp.solutions.drawing_styles
 mp_hands = mp.solutions.hands
-model = tf.keras.models.load_model("model/asl_model.h5")
 
 
 # Memory buffer to store frames (max 30 frames)
@@ -146,73 +145,75 @@ def process_hand_data(hand):
 	return np.array(data_list).reshape(1, -1)
 
 
-def get_letter(data):
+def get_letter(data, model):
 	global curr_letter
 	print("predicting letter")
-	prediction = model.predict(data, verbose=0)
+	prediction = model.predict(data, verbose=1)
+	print("predicted")
 	id = np.argmax(prediction)
 	curr_letter = LETTERS[id]
 	print(f"letter prediicted: {curr_letter}")
 
 
 def capture_hands(frame_byte_q):
-	global last_letter
-	global curr_letter
-	global last_x
-	global total_x
-	global double_letter
-	global send
-	frame_counter = 0
-	hands = mp_hands.Hands(static_image_mode=True, max_num_hands=2, min_detection_confidence=0.5)
-	print("Starting capture hands thread")
-	while True:
-		print("Ready to process on get")
-		curr_image = frame_byte_q.get(block=True)
-		frame_counter += 1
-		print(f"[capture_hands] Processing frame {frame_counter}")
-		# Read an image, flip it around y-axis for correct handedness output
-		nparr = np.frombuffer(curr_image, np.uint8)
-		if nparr is None:
-			print("NP Array failed")
-		print("Made an NP Array correctly")
-		image = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
-		if image is None:
-			print(
-				f"[capture_hands] Dropped frame {frame_counter}: image decode failed"
-			)
-			continue
-		print("imdecode worked")
-		image = cv2.flip(image, 1)
-		print("cv2 flip worked")
-		# Convert the BGR image to RGB before processing.
-		results = hands.process(cv2.cvtColor(image, cv2.COLOR_BGR2RGB))
-		print("got hands process to work")
-		if not results.multi_hand_landmarks:
-			print(
+    global last_letter
+    global curr_letter
+    global last_x
+    global total_x
+    global double_letter
+    global send
+    model = tf.keras.models.load_model("model/asl_model.h5")
+    frame_counter = 0
+    hands = mp_hands.Hands(
+        static_image_mode=False, max_num_hands=1, min_detection_confidence=0.5
+    )
+    print("Starting capture hands thread")
+    while True:
+        print("Ready to process on get")
+        curr_image = frame_byte_q.get(block=True)
+        frame_counter += 1
+        print(f"[capture_hands] Processing frame {frame_counter}")
+        # Read an image, flip it around y-axis for correct handedness output
+        nparr = np.frombuffer(curr_image, np.uint8)
+        if nparr is None:
+            print("NP Array failed")
+        print("Made an NP Array correctly")
+        image = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+        if image is None:
+            print(f"[capture_hands] Dropped frame {frame_counter}: image decode failed")
+            continue
+        print("imdecode worked")
+        image = cv2.flip(image, 1)
+        print("cv2 flip worked")
+        # Convert the BGR image to RGB before processing.
+        results = hands.process(cv2.cvtColor(image, cv2.COLOR_BGR2RGB))
+        print("got hands process to work")
+        if not results.multi_hand_landmarks:
+            print(
 				f"[capture_hands] Dropped frame {frame_counter}: no hand landmarks detected"
 			)
-			continue
-		print("got past if")
-		primary_hand = results.multi_hand_landmarks[0]
-		print("processing hand data")
-		data = process_hand_data(primary_hand)
-		print("processed hand data")
-		get_letter(data)
-		send = False
-		if curr_letter != last_letter:
-			if total_x >= 0.15:
-				double_letter = True
-			if curr_letter.isspace() == True:
-				send = True
-			transcribe(last_letter, double_letter, send)
-			last_x = 0
-			total_x = 0
-			double_letter = False
-			last_letter = curr_letter
-		# checks for double letters via wrist data
-		if curr_letter == last_letter:
-			curr_x = primary_hand.landmark[0].x
-			total_x = total_x + (curr_x - last_x)
-			last_x = curr_x
-			curr_x = 0
-		print(f"Processeed frame {frame_counter}!")
+            continue
+        print("got past if")
+        primary_hand = results.multi_hand_landmarks[0]
+        print("processing hand data")
+        data = process_hand_data(primary_hand)
+        print("processed hand data")
+        get_letter(data, model)
+        send = False
+        if curr_letter != last_letter:
+            if total_x >= 0.15:
+                double_letter = True
+            if curr_letter.isspace() == True:
+                send = True
+            transcribe(last_letter, double_letter, send)
+            last_x = 0
+            total_x = 0
+            double_letter = False
+            last_letter = curr_letter
+        # checks for double letters via wrist data
+        if curr_letter == last_letter:
+            curr_x = primary_hand.landmark[0].x
+            total_x = total_x + (curr_x - last_x)
+            last_x = curr_x
+            curr_x = 0
+        print(f"Processeed frame {frame_counter}!")

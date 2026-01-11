@@ -2,6 +2,7 @@ import json
 import os
 import yt_dlp
 from pathlib import Path
+from time import sleep
 
 def download_asl_videos(json_file, output_dir="MS-ASL/videos"):
     # 1. Load the dataset
@@ -38,6 +39,7 @@ def download_asl_videos(json_file, output_dir="MS-ASL/videos"):
             try:
                 print(f"Downloading '{label}': {video_url}")
                 ydl.download([video_url])
+                sleep(5) # sleep for 5s after each download to hopefully avoid rate limit
             except Exception as e:
                 print(f"Failed to download {video_url}: {e}")
 

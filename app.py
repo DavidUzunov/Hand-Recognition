@@ -101,8 +101,8 @@ def create_default_image():
 
     # Add text to the image
     font = cv2.FONT_HERSHEY_SIMPLEX
-    text1 = "No Camera Detected"
-    text2 = "Please connect a camera"
+    text1 = "No Stream Online"
+    text2 = "Host can login to start"
 
     # Calculate text size and position for centering
     text_size1 = cv2.getTextSize(text1, font, 2, 3)[0]

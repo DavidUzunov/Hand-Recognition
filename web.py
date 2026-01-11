@@ -22,6 +22,7 @@ from app import (
     set_sign_active,
     create_default_image,
     set_asl_transcript_callback,
+    capture_hands,
 )
 
 # --- App Setup ---
@@ -36,28 +37,36 @@ host_logged_in = False
 
 
 # --- Utility & Auth Helpers ---
-def check_auth(username, password):
-    return username == "admin" and password == "admin"
+def check_auth(username, password, role="admin"):
+    if role == "admin":
+        return username == "admin" and password == "admin"
+    elif role == "host":
+        return username == "host" and password == "host"
+    return False
 
 
-def authenticate():
+def authenticate(role="admin"):
+    realm = "Host Login" if role == "host" else "Login Required"
     return Response(
         "Could not verify your access level for that URL.\n"
         "You have to login with proper credentials",
         401,
-        {"WWW-Authenticate": 'Basic realm="Login Required"'},
+        {"WWW-Authenticate": f'Basic realm="{realm}"'},
     )
 
 
-def requires_auth(f):
-    @wraps(f)
-    def decorated(*args, **kwargs):
-        auth = request.authorization
-        if not auth or not check_auth(auth.username, auth.password):
-            return authenticate()
-        return f(*args, **kwargs)
+def requires_auth(role="admin"):
+    def decorator(f):
+        @wraps(f)
+        def decorated(*args, **kwargs):
+            auth = request.authorization
+            if not auth or not check_auth(auth.username, auth.password, role=role):
+                return authenticate(role=role)
+            return f(*args, **kwargs)
 
-    return decorated
+        return decorated
+
+    return decorator
 
 
 def send_asl_transcript(message):
@@ -98,6 +107,7 @@ def handle_host_frame(frame_bytes):
     print(
         f"Received host frame: {len(frame_bytes)} bytes (buffer size: {len(frame_buffer)})"
     )
+    capture_hands(frame_bytes)
     pass
 
 
@@ -156,17 +166,18 @@ def handle_disconnect():
 
 # --- Host Endpoint ---
 @app.route("/host")
+@requires_auth(role="host")
 def host():
     global host_logged_in
     if host_logged_in:
-        return redirect(url_for('admin'))
+        return redirect(url_for("admin"))
     host_logged_in = True
     return render_template("host.html")
 
 
 # --- Admin Endpoint ---
 @app.route("/admin")
-@requires_auth
+@requires_auth()
 def admin():
     status = None
     debug_data = None
